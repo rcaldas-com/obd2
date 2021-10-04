@@ -1,0 +1,7 @@
+version: '2'
+services:
+  obd2:
+    build: .
+    volumes:
+      - ./obd2.py:/app/app.py
+      - ./logs:/app/logs

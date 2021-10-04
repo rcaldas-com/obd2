@@ -2,8 +2,17 @@
 import obd
 from datetime import datetime
 import time
+from tinydb import TinyDB, Query
 
-# TinyDB !
+# db = TinyDB('logs/db.json')
+# db.insert({'type': 'apple', 'count': 7})
+# db.all()
+# for item in db:
+#     print(item)
+# Fruit = Query()
+# db.search(Fruit.type == 'peach')
+# db.update({'count': 10}, Fruit.type == 'apple')
+# db.remove(Fruit.count < 5)
 
 car = 'Omega_Fresh'
 commands = [
