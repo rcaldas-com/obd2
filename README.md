@@ -1,7 +1,7 @@
 Log and Analyse a vehicle reading OBD2 data from wifi or bluetooth.
 ---
 
-***It creates a csv .log file with the starting date and result of each obd2 command present in 'commands' list.***
+***Create a csv .log file with start date and result of each obd2 command present in 'commands' list.***
 
 ---
 
