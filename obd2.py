@@ -4,7 +4,6 @@ from datetime import datetime
 import time
 
 
-car = 'Omega'
 
 def loop_cmds(commands):
     data = {}
@@ -51,7 +50,8 @@ def o2_view():
         for d in data.keys():
             print(f'{d}: {data[d]}')
 
-def log_set(commands):
+car = 'Omega'
+def log_set(car, commands):
     file = open(f"logs/{car}_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.log", 'w')
     file.write(','.join(commands)+'\n') # Head of csv
     while True:
@@ -59,8 +59,7 @@ def log_set(commands):
         data = loop_cmds(commands)
         log = []
         for d in data.values():
-            try:
-                log.append(d)
+            log.append(d)
         file.write(','.join(log)+'\n')
 
 conn = obd.OBD('socket://192.168.0.10:35000')

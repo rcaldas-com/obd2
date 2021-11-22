@@ -1,0 +1,28 @@
+<Connection>:
+    MDIconButton:
+        icon: 'car-traction-control'
+        user_font_size: 100
+        pos_hint: {'center_x': .5, 'center_y': .8}
+    MDLabel:
+        text: 'OBDII Car Scanner'
+        font_style: 'H3'
+        halign: 'center'
+        pos_hint: {'center_x': .5, 'center_y': .55}
+    MDRaisedButton:
+        text: 'Conectar'
+        size_hint_x: 0.4
+        size_hint_y: 0.1
+        font_style: 'Subtitle1'
+        pos_hint: {'center_x': .5, 'center_y': 1/4}
+    MDLabel:
+        text: root.status
+        halign: 'center'
+        pos_hint: {'center_x': .5, 'center_y': .1}
+
+MDBoxLayout:
+    orientation: 'vertical'
+    MDToolbar:
+        title: 'RC OBDII'
+        right_action_items: [['theme-light-dark']]
+
+    Connection
