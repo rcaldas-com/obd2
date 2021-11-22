@@ -9,11 +9,12 @@
         halign: 'center'
         pos_hint: {'center_x': .5, 'center_y': .55}
     MDRaisedButton:
-        text: 'Conectar'
+        text: root.btn
         size_hint_x: 0.4
         size_hint_y: 0.1
         font_style: 'Subtitle1'
         pos_hint: {'center_x': .5, 'center_y': 1/4}
+        on_release: root.connect()
     MDLabel:
         text: root.status
         halign: 'center'
