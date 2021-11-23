@@ -8,17 +8,39 @@
         font_style: 'H3'
         halign: 'center'
         pos_hint: {'center_x': .5, 'center_y': .55}
+
+    MDLabel:
+        text: "Wireless"
+        halign: "center"
+        pos_hint: {'center_x': .43, 'center_y': .4}
+    MDCheckbox:
+        active: True
+        group: 'conntype'
+        pos_hint: {"center_x": .57, "center_y": .4}
+        size_hint: .1, .1
+        on_active: root.set_conntype(self.active, 'wireless')
+    MDLabel:
+        text: "Bluetooth"
+        halign: "center"
+        pos_hint: {"center_x": .43, "center_y": .32}
+    MDCheckbox:
+        group: 'conntype'
+        pos_hint: {"center_x": .57, "center_y": .32}
+        size_hint: .1, .1
+        halign: "center"
+        on_active: root.set_conntype(self.active, 'bluetooth')
+
     MDRaisedButton:
         text: root.btn
         size_hint_x: 0.4
         size_hint_y: 0.1
         font_style: 'Subtitle1'
-        pos_hint: {'center_x': .5, 'center_y': 1/4}
+        pos_hint: {'center_x': .5, 'center_y': 1/5}
         on_release: root.press(self)
     MDLabel:
         text: root.status
         halign: 'center'
-        pos_hint: {'center_x': .5, 'center_y': .1}
+        pos_hint: {'center_y': .1}
 
 MDBoxLayout:
     orientation: 'vertical'
