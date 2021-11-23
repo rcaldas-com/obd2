@@ -1,4 +1,4 @@
-Log and Analyse a vehicle reading OBD2 data from wifi or bluetooth.
+Log and Analyse OBD2 data from wifi or bluetooth with Python Kivy.
 ---
 
 ***Create a csv .log file with start date and result of each obd2 command present in 'commands' list.***
@@ -21,7 +21,8 @@ You need a obd2 scanner like ELM-327, I used a Wifi one.
 
 ### What's next
 
-- Become a portable app with Kivy
+- Change page when connected.
+- Change colors from Kivy.
 - Calculate differential ratio from velocity to estimate actual gear
 - Record in time-series format
 - Log only O2 sensors to analyse with more precision

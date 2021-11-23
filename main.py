@@ -23,13 +23,20 @@ class Connection(MDFloatLayout):
         if self.conntype == 'wireless':
             self.conn = obd.OBD('socket://192.168.0.10:35000')
         elif self.conntype == 'bluetooth':
-            print('not implemented')
+            ports = obd.scan_serial()
+            if len(ports) > 0:
+                self.conn = obd.OBD(ports[0])
+            else:
+                print(f'Nenhuma porta encontrada')
         if self.conn:
             if self.conn.is_connected():
+                print(f'Comandos suportados:\n{self.conn.supported_commands}')
                 btn.txt = 'Desconectar'
+                btn.md_bg_color = [1,0,0,1]
                 btn.bind(on_release=self.disconnect)
                 btn.disabled = False
                 self.status = 'conectado'
+                self.ids.status.color = [0,1,0,0.7]
                 return True
             else:
                 self.conn.close()
@@ -41,7 +48,9 @@ class Connection(MDFloatLayout):
         if self.conn and self.conn.is_connected():
             self.conn.close()
         self.status = 'desconectado'
+        self.ids.status.color = [1,0,0,0.7]
         self.btn = 'Conectar'
+        btn.md_bg_color = [0,0,1,1]
     def set_conntype(self, active, value):
         if active:
             self.conntype = value
@@ -105,4 +114,5 @@ class OBDII(MDApp):
     def build_app(self):
         return Builder.load_file('obd2.kv')
 
-OBDII().run()
+if __name__ == "__main__":
+    OBDII().run()
