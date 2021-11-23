@@ -40,7 +40,7 @@
     MDLabel:
         text: root.status
         id: status
-        color: 1,0,0,.7
+        color: [1,0,0,0.7]
         halign: 'center'
         pos_hint: {'center_y': .1}
 
@@ -48,6 +48,6 @@ MDBoxLayout:
     orientation: 'vertical'
     MDToolbar:
         title: 'RC OBDII'
-        right_action_items: [['theme-light-dark']]
+        right_action_items: [['theme-light-dark', lambda x: app.change_color()]]
 
     Connection

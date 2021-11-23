@@ -1,4 +1,4 @@
-from kivymd.app import MDApp
+# from kivymd.app import MDApp
 from kivymd.tools.hotreload.app import MDApp
 from kivy.lang import Builder
 from kivy.clock import Clock
@@ -43,6 +43,7 @@ class Connection(MDFloatLayout):
         btn.text = 'Conectar'
         btn.disabled = False
         self.status = 'desconectado'
+        self.ids.status.color = [1,0,0,0.7]
         return False
     def disconnect(self, *args):
         if self.conn and self.conn.is_connected():
@@ -111,7 +112,15 @@ class Connection(MDFloatLayout):
 class OBDII(MDApp):
     # KV_FILES = ['obd2.kv']
     DEBUG = True
-    def build_app(self):
+    def change_color(self):
+        theme = self.theme_cls.theme_style
+        if theme == 'Dark':
+            self.theme_cls.theme_style = 'Light'
+        else:
+            self.theme_cls.theme_style = 'Dark'
+    def build(self):
+        self.theme_cls.primary_palette = 'DeepPurple'
+        self.theme_cls.primary_hue = '700'
         return Builder.load_file('obd2.kv')
 
 if __name__ == "__main__":
