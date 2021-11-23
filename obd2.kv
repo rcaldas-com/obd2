@@ -14,7 +14,7 @@
         size_hint_y: 0.1
         font_style: 'Subtitle1'
         pos_hint: {'center_x': .5, 'center_y': 1/4}
-        on_release: root.connect()
+        on_release: root.press(self)
     MDLabel:
         text: root.status
         halign: 'center'
