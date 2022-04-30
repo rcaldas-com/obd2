@@ -59,8 +59,7 @@ def log_set(commands):
         data = loop_cmds(commands)
         log = []
         for d in data.values():
-            try:
-                log.append(d)
+            log.append(d)
         file.write(','.join(log)+'\n')
 
 conn = obd.OBD('socket://192.168.0.10:35000')

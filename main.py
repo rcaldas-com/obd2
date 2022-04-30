@@ -1,15 +1,22 @@
 # from kivymd.app import MDApp
 from kivymd.tools.hotreload.app import MDApp
-from kivy.lang import Builder
 from kivy.clock import Clock
 from functools import partial
 from kivy.properties import StringProperty, BooleanProperty
-from kivymd.uix.floatlayout import MDFloatLayout
+
 import obd
 import time
 from datetime import datetime
 
-class Connection(MDFloatLayout):
+from kivy.uix.floatlayout import FloatLayout
+
+from kivy.app import App
+from kivy.lang import Builder
+from kivy.uix.screenmanager import ScreenManager, Screen
+
+Builder.load_file('obd2.kv')
+
+class Connection(Screen):
     conn = False
     conntype = 'wireless'
     btn = StringProperty('Conectar')
@@ -37,6 +44,7 @@ class Connection(MDFloatLayout):
                 btn.disabled = False
                 self.status = 'conectado'
                 self.ids.status.color = [0,1,0,0.7]
+                self.manager.current = 'speeds'
                 return True
             else:
                 self.conn.close()
@@ -109,7 +117,11 @@ class Connection(MDFloatLayout):
                 log.append(d)
             file.write(','.join(log)+'\n')
 
-class OBDII(MDApp):
+class Speeds(Screen):
+    pass
+    # Clock.schedule_interval(lambda dt: self.read_data(), 0.10)
+
+class OBDII(App):
     # KV_FILES = ['obd2.kv']
     DEBUG = True
     def change_color(self):
@@ -119,9 +131,17 @@ class OBDII(MDApp):
         else:
             self.theme_cls.theme_style = 'Dark'
     def build(self):
-        self.theme_cls.primary_palette = 'DeepPurple'
-        self.theme_cls.primary_hue = '700'
-        return Builder.load_file('obd2.kv')
+        self.sm = ScreenManager()
+        self.sm.add_widget(Connection(name='connection'))
+        self.sm.add_widget(Speeds(name='speeds'))
+        return self.sm
+
+        # for i in ['connection', 'info']:
+        #     screen = Screen(name=i.capitalize())
+
+        # self.theme_cls.primary_palette = 'DeepPurple'
+        # self.theme_cls.primary_hue = '700'
+        # return Builder.load_file('obd2.kv')
 
 if __name__ == "__main__":
     OBDII().run()
