@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 from datetime import datetime
-import time
 
-import obd
 from flask import Flask, render_template, request, abort
 
 from connection import Connection

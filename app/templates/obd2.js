@@ -83,7 +83,8 @@ async function speed() {
       fetch('/speed').then(data => data.json())
       .then(data => {
         if (data['result']) {
-            speed_data.innerHTML = data['result']
+            speed_data.innerHTML = Object.keys(data['result']).map(k => `
+                <p><strong>${k}</strong>: ${data['result'][k]}<p><br>`)
         } else if (data['error']) {
             switch (data['error']) {
                 case 'disconnected':
