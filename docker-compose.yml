@@ -6,5 +6,5 @@ services:
       - ./app:/app
     ports:
       - "5000:5000"
-    env_file: env
-    user: "${UID}:${GID}"
+    environment:
+      - FLASK_ENV=development

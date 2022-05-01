@@ -4,14 +4,12 @@ from datetime import datetime
 
 class Connection():
     conn = False
-    def __init__(self):
-        print(self.connect())
     def get_status(self):
         if self.conn and self.conn.is_connected():
             return {'result': self.conn.port_name()}
         else:
-            self.disconnect()
-            return {'error': 'Could not connect'}
+            return {'error': 'Not connected'}
+
     def connect(self, conntype=None):
         if conntype:
             if conntype == 'wi':
@@ -22,13 +20,16 @@ class Connection():
                     self.conn = obd.OBD(ports[0])
                 else:
                     return {'error': 'No bluetooth connection found'}
-            return {'error': 'Unknown type of connection'}
+            else:
+                return {'error': 'Unknown type of connection'}
         else:
             self.conn = obd.OBD()
-        
         time.sleep(1)
+        if self.conn.is_connected():
+            return {'result': self.conn.port_name()}
+        else:
+            return {'error': 'Could not connect'}
 
-        return self.get_status()
     def disconnect(self):
         if self.conn: # and self.conn.is_connected():
             self.conn.close()

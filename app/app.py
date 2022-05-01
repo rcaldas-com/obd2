@@ -3,7 +3,7 @@ from datetime import datetime
 import time
 
 import obd
-from flask import Flask, render_template
+from flask import Flask, render_template, request
 
 from connection import Connection
 
@@ -14,9 +14,18 @@ conn = Connection()
 def index():
     return render_template('obd2.html')
 
+@app.get('/get_status')
+def get_status():
+    return conn.get_status()
+
 @app.get('/connect')
 def connect():
-    return conn.get_status()
+    return conn.connect(request.args.get('type'))
+
+@app.get('/disconnect')
+def disconnect():
+    return conn.disconnect()
+
 
 @app.get('/speed')
 def get_speeds():
