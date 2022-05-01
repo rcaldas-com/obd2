@@ -34,8 +34,8 @@ class Connection():
         if self.conn: # and self.conn.is_connected():
             self.conn.close()
     def get_cmds(self, commands):
-        if not self.conn.is_connected():
-            return {'error': 'Not connected'}
+        if not self.conn or not self.conn.is_connected():
+            return {'error': 'disconnected'}
         data = {}
         for c in commands:
             if c in self.conn.supported_commands:

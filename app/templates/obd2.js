@@ -2,11 +2,18 @@ document.addEventListener("DOMContentLoaded", (event) => {
     get_status()
 })
 const $ = ( id ) => document.getElementById( id )
-const status_div = $('status')
-const connection_div = $('connection')
-const connect_btn = $('connect')
 const spinner_w = '<div class="d-flex justify-content-center"><div class="text-center spinner-border spinner-border-sm text-ligth" role="status"></div></div>'
 
+const section_list = document.querySelectorAll("section")
+function show_section(name) {
+    section_list.forEach(s => {
+        if (s.id == name) {
+          s.style.display = 'block'
+        } else { s.style.display = 'none' }
+      })
+}
+
+const status_text = $('status')
 function get_status() {
     connect_btn.innerHTML = spinner_w
     fetch('/get_status').then(data => data.json())
@@ -14,16 +21,20 @@ function get_status() {
         if (data['result']) {
             connect_btn.innerHTML = 'Disconnect'
             connect_btn.setAttribute('onclick', 'disconnect()')
-            status_div.innerHTML = `Connected in ${data['result']}`
+            status_text.innerHTML = `Connected in ${data['result']}`
+            show_section('speed')
         } else {
             connect_btn.innerHTML = 'Connect'
             connect_btn.setAttribute('onclick', 'connect()')
-            status_div.innerHTML = 'Disconnected'
+            status_text.innerHTML = 'Disconnected'
+            show_section('connection')
             // data['error'] ? alert(data['error']) : console.error('Unknown data:', data)
         }
     }).catch(error => { alert(`Error getting status | ${error}`) })
 }
 
+const connection_div = $('connection')
+const connect_btn = $('connect')
 function connect() {
     conntype = document.querySelector('input[name="conntype"]:checked').value
     connect_btn.innerHTML = spinner_w
@@ -32,11 +43,12 @@ function connect() {
         if (data['result']) {
             connect_btn.innerHTML = 'Disconnect'
             connect_btn.setAttribute('onclick', 'disconnect()')
-            status_div.innerHTML = `Connected in ${data['result']}`
+            status_text.innerHTML = `Connected in ${data['result']}`
+            
         } else {
             connect_btn.innerHTML = 'Connect'
             connect_btn.setAttribute('onclick', 'connect()')
-            status_div.innerHTML = 'Disconnected'
+            status_text.innerHTML = 'Disconnected'
             data['error'] ? alert(data['error']) : console.error('Unknown data:', data)
         }
     }).catch(error => {
@@ -44,14 +56,13 @@ function connect() {
         get_status()
     })
 }
-
 function disconnect() {
     fetch('/disconnect').then(data => data.json())
     .then(data => {
         if (data['result']) {
             connect_btn.innerHTML = 'Connect'
             connect_btn.setAttribute('onclick', 'connect()')
-            status_div.innerHTML = 'Disconnected'
+            status_text.innerHTML = 'Disconnected'
         } else {
             data['error'] ? alert(data['error']) : console.error('Unknown data:', data)
         }
@@ -61,3 +72,34 @@ function disconnect() {
     })
 }
 
+const speed_div = $('speed')
+let speed_on = false
+async function speed() {
+    show_section('speed')
+    speed_on = true
+    while (speed_on) {
+      await new Promise(resolve => setTimeout(resolve, 500))
+      fetch('/speed').then(data => data.json())
+      .then(data => {
+        if (data['result']) {
+            speed_div.innerHTML = data['result']
+        } else if (data['error']) {
+            switch (data['error']) {
+                case 'disconnected':
+                    speed_on = false
+                    connect_btn.innerHTML = 'Connect'
+                    connect_btn.setAttribute('onclick', 'connect()')
+                    status_text.innerHTML = 'Disconnected'
+                    show_section('connection')
+                default:
+                    console.log(data['error'])
+            }
+        } else {console.error('Unknown data:', data)}
+        }).catch(error => {
+            speed_on = false
+            alert(`Error getting speed dash | ${error}`) 
+        })
+    }
+}
+
+speed()

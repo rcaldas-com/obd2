@@ -14,7 +14,7 @@
 
             <h1>OBD2 Reader</h1>
 
-            <div id="connection">
+            <section id="connection">
                 <h3>Connection</h3>
 
                 <input type="radio" name="conntype" value="wi" id="wi" checked>
@@ -27,17 +27,17 @@
                     Status: <span id="status"></span>
                 </div>
     
-            </div>
+            </section>
             
-            <div id="speed" hidden>
-                <p>Speeds Gears and Econometer</p>
-            </div>
-            <div id="temp" hidden>
-                <p>Temps</p>
-            </div>
-            <div id="o2" hidden>
-                <p>O2 and fuel trim</p>
-            </div>
+            <section id="speed" hidden>
+                {% include 'speed.html' %}
+            </section>
+            <section id="temp" hidden>
+                {% include 'temp.html' %}
+            </section>
+            <section id="o2" hidden>
+                {% include 'o2.html' %}
+            </section>
               
         {% endblock %}
     </body>

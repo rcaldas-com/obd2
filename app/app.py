@@ -31,18 +31,21 @@ def disconnect():
 def get_speeds():
     commands = ['RPM', 'SPEED', 'COOLANT_TEMP']
     data = conn.get_cmds(commands)
-    if data['RPM'] == 0 or data['SPEED'] == 0:
-        data['RATIO'] = 0
+    if data.get('result'):
+        if data['RPM'] == 0 or data['SPEED'] == 0:
+            data['RATIO'] = 0
+        else:
+            rps = data['RPM']/60
+            mps = data['SPEED']*0.277777
+            final_drive  = 2.87
+            tire_circumference = 2.085
+            data['RATIO'] = (rps / (mps / tire_circumference)) / final_drive
+            # gear = min((abs(current_gear_ratio - i), i) for i in gear_ratios)[1] 
+        for d in data.keys():
+            print(f'{d}: {data[d]}')
+        return {'result': data}
     else:
-        rps = data['RPM']/60
-        mps = data['SPEED']*0.277777
-        final_drive  = 2.87
-        tire_circumference = 2.085
-        data['RATIO'] = (rps / (mps / tire_circumference)) / final_drive
-        # gear = min((abs(current_gear_ratio - i), i) for i in gear_ratios)[1] 
-    for d in data.keys():
-        print(f'{d}: {data[d]}')
-    return {'result': data}
+        return data
 
 @app.get('/o2')
 def get_o2():
