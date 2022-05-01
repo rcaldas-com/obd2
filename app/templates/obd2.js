@@ -22,7 +22,7 @@ function get_status() {
             connect_btn.innerHTML = 'Disconnect'
             connect_btn.setAttribute('onclick', 'disconnect()')
             status_text.innerHTML = `Connected in ${data['result']}`
-            show_section('speed')
+            speed()
         } else {
             connect_btn.innerHTML = 'Connect'
             connect_btn.setAttribute('onclick', 'connect()')
@@ -44,7 +44,7 @@ function connect() {
             connect_btn.innerHTML = 'Disconnect'
             connect_btn.setAttribute('onclick', 'disconnect()')
             status_text.innerHTML = `Connected in ${data['result']}`
-            
+            speed()
         } else {
             connect_btn.innerHTML = 'Connect'
             connect_btn.setAttribute('onclick', 'connect()')
@@ -73,16 +73,17 @@ function disconnect() {
 }
 
 const speed_div = $('speed')
+const speed_data = speed_div.querySelector('#speed_data')
 let speed_on = false
 async function speed() {
     show_section('speed')
     speed_on = true
     while (speed_on) {
-      await new Promise(resolve => setTimeout(resolve, 500))
+      await new Promise(resolve => setTimeout(resolve, 5000))
       fetch('/speed').then(data => data.json())
       .then(data => {
         if (data['result']) {
-            speed_div.innerHTML = data['result']
+            speed_data.innerHTML = data['result']
         } else if (data['error']) {
             switch (data['error']) {
                 case 'disconnected':
@@ -101,5 +102,3 @@ async function speed() {
         })
     }
 }
-
-speed()
