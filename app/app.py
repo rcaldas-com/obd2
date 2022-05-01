@@ -5,87 +5,60 @@ import time
 import obd
 from flask import Flask, render_template
 
+from connection import Connection
+
 app = Flask(__name__)
+conn = Connection()
 
 @app.get('/')
 def index():
     return render_template('obd2.html')
 
+@app.get('/connect')
+def connect():
+    return conn.get_status()
 
-@app.get('/api')
-def get_api():
-    return {'result': 'ok'}
+@app.get('/speed')
+def get_speeds():
+    commands = ['RPM', 'SPEED', 'COOLANT_TEMP']
+    data = conn.get_cmds(commands)
+    if data['RPM'] == 0 or data['SPEED'] == 0:
+        data['RATIO'] = 0
+    else:
+        rps = data['RPM']/60
+        mps = data['SPEED']*0.277777
+        final_drive  = 2.87
+        tire_circumference = 2.085
+        data['RATIO'] = (rps / (mps / tire_circumference)) / final_drive
+        # gear = min((abs(current_gear_ratio - i), i) for i in gear_ratios)[1] 
+    for d in data.keys():
+        print(f'{d}: {data[d]}')
+    return {'result': data}
 
-# @app.before_first_request
-# def before_first_request():
-#     conn = obd.OBD()
-
-# 'socket://192.168.0.10:35000'
-
-# if conn.is_connected():
-#     print('\nCollecting...')
-#     try:
-#         speed_view()
-#         # log_set(o2Set)
-#     except KeyboardInterrupt:
-#         print("Stopped")
-#     # file.close()
-# else:
-#     print('Not connected')
-# conn.close()
-
-
-
+@app.get('/o2')
+def get_o2():
+    commands = [
+        'O2_S1_WR_CURRENT',
+        'O2_S5_WR_CURRENT',
+        'SHORT_FUEL_TRIM_1',
+        'SHORT_FUEL_TRIM_2',
+        'INTAKE_TEMP'
+    ]
+    data = conn.get_cmds(commands)
+    if data['O2_S1_WR_CURRENT'] < -0.01:
+        data['color'] = 'blue'
+    elif data['O2_S1_WR_CURRENT'] <= 0.01:
+        data['color'] = 'green'
+    else:
+        data['color'] = 'red'
+    for d in data.keys():
+        print(f'{d}: {data[d]}')
+    return {'result': data}
 
 
 
 ### LOG
 # carname
-
-# def loop_cmds(commands):
-#     data = {}
-#     for c in commands:
-#         try:
-#             data[c] = conn.query(obd.commands[c]).value.magnitude
-#         except Exception as ex:
-#             data[c] = False
-#             print(f"Error in {c} command: {ex}")
-#     return data
-
-# def speed_view():
-#     commands = ['RPM', 'SPEED', 'COOLANT_TEMP']
-#     while True:
-#         data = loop_cmds(commands)
-#         if data['RPM'] == 0 or data['SPEED'] == 0:
-#             data['RATIO'] = 0
-#         else:
-#             rps = data['RPM']/60
-#             mps = data['SPEED']*0.277777
-#             final_drive  = 2.87
-#             tire_circumference = 2.085
-#             data['RATIO'] = (rps / (mps / tire_circumference)) / final_drive
-#             # gear = min((abs(current_gear_ratio - i), i) for i in gear_ratios)[1] 
-#         for d in data.keys():
-#             print(f'{d}: {data[d]}')
-
-# def o2_view():
-#     commands = [
-#         'O2_S1_WR_CURRENT',
-#         'O2_S5_WR_CURRENT',
-#         'SHORT_FUEL_TRIM_1',
-#         'SHORT_FUEL_TRIM_2',
-#         'INTAKE_TEMP'
-#     ]
-#     while True:
-#         data = loop_cmds(commands)
-#         if data['O2_S1_WR_CURRENT'] < -0.01:
-#             data['color'] = 'blue'
-#         elif data['O2_S1_WR_CURRENT'] <= 0.01:
-#             data['color'] = 'green'
-#         else:
-#             data['color'] = 'red'
-#         for d in data.keys():
-#             print(f'{d}: {data[d]}')
 
 # def log_set(commands):
 #     file = open(f"logs/{car}_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.log", 'w')
