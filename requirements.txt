@@ -1,5 +1,3 @@
 obd
-kivy[base]
-# kivymd
-git+https://github.com/kivymd/KivyMD.git#master
-watchdog
+flask
+# gunicorn

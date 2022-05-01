@@ -1,7 +1,10 @@
-version: '2'
+version: "3"
 services:
-  obd2:
+  flask:
     build: .
     volumes:
-      - ./obd2.py:/app/app.py
-      - ./logs:/app/logs
+      - ./app:/app
+    ports:
+      - "8080:5000"
+    env_file: env
+    user: "${UID}:${GID}"

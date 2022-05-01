@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <title>OBD2 Reader</title>
+        <meta charset="utf-8">
+        <meta content="width=device-width, initial-scale=1.0" name="viewport">
+        {% block styles %}
+        <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
+        <link href="{{ url_for('static', filename='img/favicon.ico') }}" rel="icon">
+        {% endblock %}
+    </head>
+    <body class="text-center">
+        {% block content %}
+
+            <h1>OBD2 Reader</h1>
+
+            <div id="connection">
+                <h3>Connection</h3>
+
+                <input type="radio" name="conn_type" value="wi" id="wi" checked>
+                <label for="wi">Wireless</label>
+                <input type="radio" name="conn_type" value="bt" id="bt">
+                <label for="bt">Bluetooth</label>
+
+                <button type="button" class="btn btn-primary" onclick="connect()">Conect</button>
+                <div id="status"></div>
+    
+            </div>
+            
+            1. Speeds Gears and Econometer
+            2. O2
+            3. Temps
+            ...
+              
+        {% endblock %}
+    </body>
+    {% block scripts %}
+        <script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
+        <script>
+            {% include 'obd2.js' %}
+        </script>
+    {% endblock %}
+</html>
