@@ -11,10 +11,11 @@ You need a obd2 adapter like ELM-327, I used a Wifi one.
 
 You need Docker or install the python requirements in your env or venv  
 
-With Docker:  
+Docker Install:   
 - Install docker if not already installed: [Docker Install](https://docs.docker.com/engine/install/)  
-- Get docker-compose binary for your system: [Docker Compose Install](https://docs.docker.com/compose/install/)  
-- Run: `docker-compose up`  
+   
+Run Docker:   
+- Run: `docker compose up`  
 
 Local run:  
 - `cd app`  

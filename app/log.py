@@ -5,44 +5,50 @@ import time
 
 # TinyDB !
 
-car = 'Omega_Fresh'
+car = 'Fit'
 commands = [
     'RPM',
     'COOLANT_TEMP',
-    'MAF',
-    'THROTTLE_POS',
+    # 'MAF',
+    # 'THROTTLE_POS',
     'INTAKE_TEMP',
     'TIMING_ADVANCE',
     'ENGINE_LOAD',
     'ELM_VOLTAGE',
-    'SPEED',
-    'O2_S1_WR_CURRENT',
-    'O2_S5_WR_CURRENT',
+    # 'SPEED',
+    # 'O2_S1_WR_CURRENT',
+    # 'O2_S5_WR_CURRENT',
     # 'O2_B1S2',
-    'O2_B2S2',
+    # 'O2_B2S2',
     'SHORT_FUEL_TRIM_1',
-    # 'LONG_FUEL_TRIM_1',
-    'SHORT_FUEL_TRIM_2',
+    # 'SHORT_FUEL_TRIM_2',
+    'LONG_FUEL_TRIM_1',
     # 'LONG_FUEL_TRIM_2'
 ]
 
 conn = obd.OBD('socket://192.168.0.10:35000')
+
+for i in conn.supported_commands:
+    print(i)
+    print('\n')
+
+
 # conn = obd.Async('/dev/ttyCAN0')
 # obd.logger.setLevel(obd.logging.DEBUG)
 # obd.logger.removeHandler(obd.console_handler)
 
 if conn.is_connected():
-    file = open(f"logs/{car}_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.log", 'w')
+    file = open(f"../logs/{car}_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.log", 'w')
     print('\nCollecting...')
     try:
         head = [c for c in commands]
+        head.append('timestamp')
         file.write(','.join(head)+'\n')
         # for c in commands:
         #     conn.watch(obd.commands[c])
         # conn.start()
         time.sleep(1)
         while True:
-            print(datetime.now().time())
             log = []
             for c in commands:
                 try:
@@ -50,8 +56,10 @@ if conn.is_connected():
                 except Exception as ex:
                     print(f"Error in {c} command: {ex}")
                     log.append('')
+            log.append(str(datetime.now().timestamp()))
+            print(log)
             file.write(','.join(log)+'\n')
-            # time.sleep(0.359) # ~ 0.997 / 2
+            time.sleep(0.359) # ~ 0.997 / 2
     except KeyboardInterrupt:
         print("Stopped")
     file.close()

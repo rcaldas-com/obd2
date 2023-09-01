@@ -27,6 +27,10 @@ class Connection():
         time.sleep(1)
         if self.conn.is_connected():
             self.suported = [x.name for x in self.conn.supported_commands]
+            
+            # for i in self.suported:
+            #     print(i)
+
             return {'result': self.conn.port_name()}
         else:
             return {'error': 'Could not connect'}

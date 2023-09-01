@@ -73,13 +73,13 @@ function disconnect() {
 }
 
 const speed_div = $('speed')
-const speed_data = speed_div.querySelector('#speed_data')
+const speed_data = $('speed_data')
 let speed_on = false
 async function speed() {
     show_section('speed')
     speed_on = true
     while (speed_on) {
-      await new Promise(resolve => setTimeout(resolve, 5000))
+      await new Promise(resolve => setTimeout(resolve, 1000))
       fetch('/speed').then(data => data.json())
       .then(data => {
         if (data['result']) {
