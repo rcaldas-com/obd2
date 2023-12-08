@@ -7,37 +7,67 @@ import time
 
 car = 'Fit'
 commands = [
-    'RPM',
-    'COOLANT_TEMP',
-    # 'MAF',
-    # 'THROTTLE_POS',
-    'INTAKE_TEMP',
-    'TIMING_ADVANCE',
-    'ENGINE_LOAD',
-    'ELM_VOLTAGE',
-    # 'SPEED',
-    # 'O2_S1_WR_CURRENT',
-    # 'O2_S5_WR_CURRENT',
-    # 'O2_B1S2',
-    # 'O2_B2S2',
-    'SHORT_FUEL_TRIM_1',
-    # 'SHORT_FUEL_TRIM_2',
-    'LONG_FUEL_TRIM_1',
-    # 'LONG_FUEL_TRIM_2'
+    "RPM",
+    "INTAKE_PRESSURE",
+    "TIMING_ADVANCE",
+    "COOLANT_TEMP",
+    "INTAKE_TEMP",
+    "SPEED",
+    "SHORT_FUEL_TRIM_1",
+    "O2_S1_WR_CURRENT",
+    "RELATIVE_THROTTLE_POS",
 ]
 
-conn = obd.OBD('socket://192.168.0.10:35000')
+# commands = [
+#     'RPM',
+#     'COOLANT_TEMP',
+#     # 'MAF',
+#     # 'THROTTLE_POS',
+#     'INTAKE_TEMP',
+#     'TIMING_ADVANCE',
+#     'ENGINE_LOAD',
+#     'ELM_VOLTAGE',
+#     # 'SPEED',
+#     # 'O2_S1_WR_CURRENT',
+#     # 'O2_S5_WR_CURRENT',
+#     # 'O2_B1S2',
+#     # 'O2_B2S2',
+#     'SHORT_FUEL_TRIM_1',
+#     # 'SHORT_FUEL_TRIM_2',
+#     'LONG_FUEL_TRIM_1',
+#     # 'LONG_FUEL_TRIM_2'
+# ]
 
-for i in conn.supported_commands:
-    print(i)
-    print('\n')
-
-
-# conn = obd.Async('/dev/ttyCAN0')
 # obd.logger.setLevel(obd.logging.DEBUG)
+# conn = obd.OBD('socket://192.168.0.10:35000')
 # obd.logger.removeHandler(obd.console_handler)
+# conn = obd.Async('/dev/ttyUSB0')
+conn = obd.OBD("/dev/ttyUSB0")
+
+# print('Supported Commands:')
+# for i in conn.supported_commands:
+#     print(i)
 
 if conn.is_connected():
+    # for i in dir(obd.commands):
+    #     print(i)
+
+    # for c in commands:
+    #     c = c.strip('\n')
+    #     result = conn.query(obd.commands[c])
+    #     if result.is_null():
+    #         print(f'{c} inválido')
+    #         continue
+    #     try:
+    #         print(f'{datetime.now().timestamp()}\t{c}: {str(result.value.magnitude)}')
+    #     except Exception as ex:
+    #         if 'magnitude' in str(ex):
+    #                 print(f'{datetime.now().timestamp()}\t{c}: {str(result.value)}')
+    #         else:
+    #             print(f"Error in {c} command: {ex}")
+
+    # exit(9)
+
     file = open(f"../logs/{car}_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.log", 'w')
     print('\nCollecting...')
     try:
@@ -50,6 +80,11 @@ if conn.is_connected():
         time.sleep(1)
         while True:
             log = []
+            status = conn.query(obd.commands.FUEL_STATUS).value[0]
+            if not 'Closed' in status:
+                print(status)
+                time.sleep(0.5)
+                continue
             for c in commands:
                 try:
                     log.append(str(conn.query(obd.commands[c]).value.magnitude))
@@ -59,7 +94,7 @@ if conn.is_connected():
             log.append(str(datetime.now().timestamp()))
             print(log)
             file.write(','.join(log)+'\n')
-            time.sleep(0.359) # ~ 0.997 / 2
+            time.sleep(0.3)
     except KeyboardInterrupt:
         print("Stopped")
     file.close()
@@ -68,6 +103,7 @@ else:
 conn.close()
 # conn.stop()
 
+    # with open('../logs/fit_commands.txt') as f:
 
 
 
