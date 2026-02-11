@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- CH340 (maioria dos clones ELM327 USB) -->
+    <usb-device vendor-id="6790" product-id="29987" /> <!-- 0x1A86 / 0x7523 -->
+
+    <!-- FTDI -->
+    <usb-device vendor-id="1027" product-id="24577" /> <!-- 0x0403 / 0x6001 -->
+
+    <!-- CP2102 (Silicon Labs) -->
+    <usb-device vendor-id="4292" product-id="60000" /> <!-- 0x10C4 / 0xEA60 -->
+
+    <!-- Prolific PL2303 -->
+    <usb-device vendor-id="1659" product-id="8963" /> <!-- 0x067B / 0x2303 -->
+</resources>
