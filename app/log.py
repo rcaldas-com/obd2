@@ -22,15 +22,8 @@ import csv
 
 car = 'Omega2005'
 commands = [
-    "RPM",
-    "TIMING_ADVANCE",
-    # "COOLANT_TEMP",
-    # "INTAKE_TEMP",
-    # "RELATIVE_THROTTLE_POS",
-    "O2_S1_WR_CURRENT",
-    "O2_S5_WR_CURRENT",
-    # "SHORT_FUEL_TRIM_1",
-    # "SHORT_FUEL_TRIM_2"
+    "O2_S1_WR_CURRENT",  # Lambda11 - Banco 1 (valor nativo)
+    "O2_S5_WR_CURRENT",  # Lambda21 - Banco 2 (valor nativo)
 ]
 
 log_file_path = f"logs/{car}_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.csv"
@@ -73,15 +66,59 @@ conn = obd.OBD("/dev/ttyUSB0")
 
 # Verificar conexão
 if not conn.is_connected():
-    print("Not connected")
+    print("Not connected to OBD2")
     exit()
+else:
+    print("Connected to OBD2!")
+    print(f"Protocol: {conn.protocol_name()}")
+    
+# Verificar quais comandos são suportados
+print("\nSupported commands:")
+for cmd in commands:
+    if obd.commands[cmd] in conn.supported_commands:
+        print(f"  ✓ {cmd}")
+    else:
+        print(f"  ✗ {cmd} - NOT SUPPORTED")
+
+print(f"\nTotal supported commands: {len(conn.supported_commands)}")
+print("\nStarting data collection...")
 
 # print('Supported Commands:')
 # for i in conn.supported_commands:
 #     print(i)
 
+# Função para converter corrente lambda nativa (mA) para lambda
+def current_to_lambda(current_ma):
+    """
+    Os comandos O2_S1_WR_CURRENT e O2_S5_WR_CURRENT já fornecem
+    valores nativos de corrente lambda da central.
+    
+    Baseado no teste: 
+    - Sensor 1: 0.0 mA
+    - Sensor 5: 0.0078125 mA
+    
+    Estes valores são diretamente proporcionais ao lambda.
+    """
+    if current_ma is None:
+        return None
+    
+    # Os valores já vêm da central como corrente lambda
+    # Conversão direta proporcional (calibração pode precisar ajuste)
+    
+    # Para valores muito pequenos (próximos de 0), assumir lambda ~1.0
+    if abs(current_ma) < 0.001:  # Valores menores que 1mA
+        return 1.0
+    
+    # Conversão baseada na resposta da central
+    # Valores observados: -0.090mA a +0.109mA
+    # Escala corrigida: ±0.1mA ≈ ±0.3λ (faixa típica 0.7-1.3)
+    lambda_offset = current_ma * 3  # Escala corrigida baseada nos dados reais
+    return 1.0 + lambda_offset
+
 # Dados para o gráfico
 data = {cmd: [] for cmd in commands}
+data['LAMBDA11'] = []  # Lambda calculado da sonda 1
+data['LAMBDA21'] = []  # Lambda calculado da sonda 2
 # timestamps = []
 
 
@@ -97,7 +134,39 @@ def update_data(frame):
     for cmd in commands:
         try:
             result = conn.query(obd.commands[cmd])
-            value = result.value.magnitude if result.value else None
+            if result.value is not None:
+                # Tratamento especial para temperaturas (unidades com offset)
+                if cmd in ['COOLANT_TEMP', 'INTAKE_TEMP', 'AMBIENT_AIR_TEMP']:
+                    # Para temperaturas, converter para Celsius e pegar apenas o valor numérico
+                    if hasattr(result.value, 'to'):
+                        value = float(result.value.to('celsius').magnitude)
+                    else:
+                        value = float(result.value.magnitude)
+                else:
+                    # Para outros comandos, usar magnitude normalmente
+                    value = result.value.magnitude if hasattr(result.value, 'magnitude') else result.value
+                
+                # Calcular lambda para sensores de O2
+                if cmd == 'O2_S1_WR_CURRENT':
+                    lambda11 = current_to_lambda(value)
+                    data['LAMBDA11'].append(lambda11)
+                    print(f"Lambda11: {lambda11:.3f} (current: {value:.3f}mA)")
+                elif cmd == 'O2_S5_WR_CURRENT':
+                    lambda21 = current_to_lambda(value)
+                    data['LAMBDA21'].append(lambda21)
+                    print(f"Lambda21: {lambda21:.3f} (current: {value:.3f}mA)")
+                else:
+                    print(f"{cmd}: {value}")  # Debug: mostrar valor lido
+            else:
+                value = None
+                if cmd == 'O2_S1_WR_CURRENT':
+                    data['LAMBDA11'].append(None)
+                    print("Lambda11: NULL")
+                elif cmd == 'O2_S5_WR_CURRENT':
+                    data['LAMBDA21'].append(None)
+                    print("Lambda21: NULL")
+                else:
+                    print(f"{cmd}: NULL result")  # Debug: mostrar quando não há valor
             data[cmd].append(value)
             log.append(value)
         except Exception as ex:
@@ -112,103 +181,92 @@ def update_data(frame):
     writer.writerow(log)
 
     # Limitar o número de pontos no gráfico
-    max_points = 20
+    max_points = 50  # Aumentar pontos para melhor visualização
     # if len(timestamps) > max_points:
     #     timestamps = timestamps[-max_points:]
     for cmd in commands:
         data[cmd] = data[cmd][-max_points:]
+    # Limitar também os dados de lambda
+    data['LAMBDA11'] = data['LAMBDA11'][-max_points:]
+    data['LAMBDA21'] = data['LAMBDA21'][-max_points:]
 
 # Função para atualizar o gráfico
 def update_plot(frame):
     update_data(frame)
-    # ax1.clear()  # Limpar apenas o eixo principal (RPM)
-    ax2.clear()  # Limpar apenas o eixo secundário (O2)
-    ax3.clear()  # Limpar o terceiro eixo (TIMING_ADVANCE)
+    ax1.clear()  # LAMBDA (eixo principal)
+    ax2.clear()  # RPM
+    ax3.clear()  # TIMING_ADVANCE  
+    ax4.clear()  # COOLANT_TEMP
 
-    # # Gráfico principal (eixo y para RPM)
-    # ax1.plot(timestamps, data["RPM"], label="RPM", color="blue")
-    # ax1.set_ylabel("RPM", color="blue")
-    # ax1.tick_params(axis="y", labelcolor="blue")
-    # ax1.set_ylim(0, 6500)  # Definir escala fixa para o eixo y do RPM
+    # Gráfico PRINCIPAL para LAMBDA (eixo y principal)
+    x_axis = range(len(data["LAMBDA11"]))
+    ax1.plot(x_axis, data["LAMBDA11"], label="Lambda11 (Banco 1)", color="green", linewidth=2)
+    ax1.plot(x_axis, data["LAMBDA21"], label="Lambda21 (Banco 2)", color="red", linewidth=2)
+    ax1.set_ylabel("Lambda (λ)", color="green", fontsize=12, fontweight='bold')
+    ax1.tick_params(axis="y", labelcolor="green")
+    ax1.set_ylim(0.6, 1.4)  # Faixa típica de lambda para visualização
+    ax1.grid(True, alpha=0.3)
+    
+    # Linhas de referência lambda
+    ax1.axhline(y=0.85, color="orange", linestyle="--", linewidth=1, alpha=0.7, label="Rico (0.85λ)")
+    ax1.axhline(y=1.00, color="black", linestyle="-", linewidth=1.5, alpha=0.8, label="Estequiométrico (1.0λ)")
+    ax1.axhline(y=1.15, color="blue", linestyle="--", linewidth=1, alpha=0.7, label="Pobre (1.15λ)")
 
-    # # Exibir o valor atual de RPM no gráfico
-    # if data["RPM"] and data["RPM"][-1] is not None:
-    #     ax1.text(
-    #         timestamps[-1], data["RPM"][-1],
-    #         f"{data['RPM'][-1]:.0f} RPM",
-    #         color="blue", fontsize=10, ha="right"
-    #     )
-
-    # Gráfico para TIMING_ADVANCE (agora no lado esquerdo)
-    # ax2.plot(timestamps, data["TIMING_ADVANCE"], label="TIMING_ADVANCE", color="orange")
-    ax2.plot(range(len(data["TIMING_ADVANCE"])), data["TIMING_ADVANCE"], label="TIMING_ADVANCE", color="orange")
-    ax2.set_ylabel("Timing Advance (°)", color="orange")
-    ax2.tick_params(axis="y", labelcolor="orange")
-    ax2.set_ylim(-30, 40)  # Limites fixos de -30 a 40
-
-    # Exibir o valor atual de TIMING_ADVANCE no gráfico
-    if data["TIMING_ADVANCE"] and data["TIMING_ADVANCE"][-1] is not None:
-        ax2.text(
-            # timestamps[-1], data["TIMING_ADVANCE"][-1],
-            len(data["TIMING_ADVANCE"]) - 1, data["TIMING_ADVANCE"][-1],  # Substituído timestamps[-1]
-            f"{data['TIMING_ADVANCE'][-1]:.1f}°",
-            color="orange", fontsize=10, ha="right"
+    # Exibir valores atuais de lambda
+    if data["LAMBDA11"] and data["LAMBDA11"][-1] is not None:
+        ax1.text(
+            len(data["LAMBDA11"]) - 1, data["LAMBDA11"][-1] + 0.05,
+            f"λ11: {data['LAMBDA11'][-1]:.3f}",
+            color="green", fontsize=12, ha="right", fontweight='bold'
+        )
+    if data["LAMBDA21"] and data["LAMBDA21"][-1] is not None:
+        ax1.text(
+            len(data["LAMBDA21"]) - 1, data["LAMBDA21"][-1] - 0.05,
+            f"λ21: {data['LAMBDA21'][-1]:.3f}",
+            color="red", fontsize=12, ha="right", fontweight='bold'
         )
 
-    # Gráfico para O2_S1_WR_CURRENT e O2_S5_WR_CURRENT (agora no lado direito)
-    # ax3.plot(timestamps, data["O2_S5_WR_CURRENT"], label="O2_S5_WR_CURRENT", color="red")
-    ax3.plot(range(len(data["O2_S1_WR_CURRENT"])), data["O2_S1_WR_CURRENT"], label="O2_S1_WR_CURRENT", color="green")
-    ax3.plot(range(len(data["O2_S5_WR_CURRENT"])), data["O2_S5_WR_CURRENT"], label="O2_S5_WR_CURRENT", color="red")
-    ax3.set_ylabel("O2 Sensor Current (mA)", color="green")
-    ax3.tick_params(axis="y", labelcolor="green")
-    ax3.set_ylim(-1, 1)  # Limites fixos de -1 a +1
-    ax3.set_yticks([-1, -0.3, 0, 0.3, 1])  # Marcar -1, -0.3, 0, 0.3 e 1
+    # Gráfico para RPM (eixo secundário)
+    ax2.plot(range(len(data["RPM"])), data["RPM"], label="RPM", color="blue", alpha=0.7)
+    ax2.set_ylabel("RPM", color="blue")
+    ax2.tick_params(axis="y", labelcolor="blue")
+    ax2.set_ylim(0, 6500)  # Definir escala fixa para o eixo y do RPM
 
-    # Adicionar linhas horizontais nas marcas -0.3, 0 e +0.3
-    ax3.axhline(y=-0.3, color="gray", linestyle="--", linewidth=0.8, label="-0.3")
-    ax3.axhline(y=0, color="gray", linestyle="--", linewidth=0.8, label="0")
-    ax3.axhline(y=0.3, color="gray", linestyle="--", linewidth=0.8, label="+0.3")
+    # Gráfico para TIMING_ADVANCE (menor prioridade)
+    ax3.plot(range(len(data["TIMING_ADVANCE"])), data["TIMING_ADVANCE"], label="TIMING_ADVANCE", color="orange", alpha=0.6)
+    ax3.set_ylabel("Timing (°)", color="orange", fontsize=10)
+    ax3.tick_params(axis="y", labelcolor="orange")
+    ax3.set_ylim(-30, 40)
 
-    # Exibir os valores atuais dos sensores de oxigênio no gráfico
-    if data["O2_S1_WR_CURRENT"] and data["O2_S1_WR_CURRENT"][-1] is not None:
-        ax3.text(
-            # timestamps[-1], data["O2_S1_WR_CURRENT"][-1],
-            len(data["O2_S1_WR_CURRENT"]) - 1, data["O2_S1_WR_CURRENT"][-1],  # Substituído timestamps[-1]
-            f"{data['O2_S1_WR_CURRENT'][-1]:.2f} mA",
-            color="green", fontsize=10, ha="right"
-        )
-
-    if data["O2_S5_WR_CURRENT"] and data["O2_S5_WR_CURRENT"][-1] is not None:
-        ax3.text(
-            # timestamps[-1], data["O2_S5_WR_CURRENT"][-1],
-            len(data["O2_S5_WR_CURRENT"]) - 1, data["O2_S5_WR_CURRENT"][-1],  # Substituído timestamps[-1]
-            f"{data['O2_S5_WR_CURRENT'][-1]:.2f} mA",
-            color="red", fontsize=10, ha="right"
-        )
+    # Gráfico para COOLANT_TEMP (menor prioridade)
+    ax4.plot(range(len(data["COOLANT_TEMP"])), data["COOLANT_TEMP"], label="COOLANT_TEMP", color="purple", alpha=0.6)
+    ax4.set_ylabel("Temp (°C)", color="purple", fontsize=10)
+    ax4.tick_params(axis="y", labelcolor="purple")
+    ax4.set_ylim(80, 120)  # Faixa típica de temperatura
 
     # Configurações gerais
-    # ax1.set_xlabel("Timestamp")
-    # ax1.legend(loc="upper left")
-    ax2.legend(loc="upper left")
-    ax3.legend(loc="lower left")
-    plt.title(f"Live Data for {car}")
+    ax1.set_xlabel("Amostras", fontsize=12)
+    ax1.legend(loc="upper left", fontsize=10)
+    ax2.legend(loc="lower left", fontsize=8)
+    ax3.legend(loc="lower center", fontsize=8)
+    ax4.legend(loc="lower right", fontsize=8)
+    plt.title(f"Lambda Monitor - {car}", fontsize=14, fontweight='bold')
     # plt.tight_layout()  # Removido para melhorar o desempenho
 
 # Configurar o gráfico
-# fig, ax1 = plt.subplots(figsize=(15, 9))  # Aumentar o tamanho da figura
-# ax2 = ax1.twinx()  # Criar um segundo eixo y
-# ax3 = ax1.twinx()  # Criar um terceiro eixo y
-fig, ax2 = plt.subplots(figsize=(15, 9))  # Aumentar o tamanho da figura
-ax3 = ax2.twinx()  # Criar um terceiro eixo y
+fig, ax1 = plt.subplots(figsize=(15, 9))  # Eixo principal para RPM
+ax2 = ax1.twinx()  # Segundo eixo para TIMING_ADVANCE
+ax3 = ax1.twinx()  # Terceiro eixo para COOLANT_TEMP
+ax4 = ax1.twinx()  # Quarto eixo para O2_S5_WR_CURRENT
 
-
-# Ajustar o terceiro eixo para o lado direito
-# ax3.spines["right"].set_position(("outward", 60))  # Deslocar o eixo para evitar sobreposição
+# Ajustar os eixos para não sobrepor
+ax3.spines["right"].set_position(("outward", 60))  # Deslocar o terceiro eixo
+ax4.spines["right"].set_position(("outward", 120))  # Deslocar o quarto eixo
 
 # Ajustar manualmente os espaços
-plt.subplots_adjust(left=0.1, right=0.9, top=0.9, bottom=0.2)
+plt.subplots_adjust(left=0.1, right=0.8, top=0.9, bottom=0.2)
 
-ani = FuncAnimation(fig, update_plot, interval=50, cache_frame_data=False)
+ani = FuncAnimation(fig, update_plot, interval=20, cache_frame_data=False)  # 20ms = 50Hz para máxima responsividade
 
 # Mostrar o gráfico
 try:
