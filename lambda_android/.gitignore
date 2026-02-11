@@ -1,0 +1,11 @@
+# Android build intermediates
+.gradle/
+app/build/generated/
+app/build/intermediates/
+app/build/tmp/
+local.properties
+*.iml
+.idea/
+
+# Keep the APK
+!app/build/outputs/

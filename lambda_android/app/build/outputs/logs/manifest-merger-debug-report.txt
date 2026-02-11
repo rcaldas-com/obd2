@@ -1,0 +1,230 @@
+-- Merging decision tree log ---
+manifest
+ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:2:1-40:12
+INJECTED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:2:1-40:12
+INJECTED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:2:1-40:12
+INJECTED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:2:1-40:12
+MERGED from [androidx.appcompat:appcompat-resources:1.6.1] /home/robca/.gradle/caches/8.10.2/transforms/eda811fbee4fa48fb11a2e276a557355/transformed/jetified-appcompat-resources-1.6.1/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.appcompat:appcompat:1.6.1] /home/robca/.gradle/caches/8.10.2/transforms/2cabc5eed3dd2e9bc3fe41840b7685d5/transformed/appcompat-1.6.1/AndroidManifest.xml:17:1-22:12
+MERGED from [com.github.mik3y:usb-serial-for-android:3.7.3] /home/robca/.gradle/caches/8.10.2/transforms/319c7470fd833b597ec30170c8952604/transformed/jetified-usb-serial-for-android-3.7.3/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.fragment:fragment:1.3.6] /home/robca/.gradle/caches/8.10.2/transforms/a34b636c2f9947389e5c45e9233601fd/transformed/fragment-1.3.6/AndroidManifest.xml:17:1-24:12
+MERGED from [androidx.activity:activity:1.6.0] /home/robca/.gradle/caches/8.10.2/transforms/6d251d19b590ebe156b63e0f0cc52cda/transformed/jetified-activity-1.6.0/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.drawerlayout:drawerlayout:1.0.0] /home/robca/.gradle/caches/8.10.2/transforms/0c596bf8699928c31b15ad577008b3cf/transformed/drawerlayout-1.0.0/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.emoji2:emoji2-views-helper:1.2.0] /home/robca/.gradle/caches/8.10.2/transforms/5701d09b76ed63c5c37fd8088c8bae74/transformed/jetified-emoji2-views-helper-1.2.0/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.emoji2:emoji2:1.2.0] /home/robca/.gradle/caches/8.10.2/transforms/cbbd37dd9caa8e1da1ea6744dbdcfd04/transformed/jetified-emoji2-1.2.0/AndroidManifest.xml:17:1-35:12
+MERGED from [androidx.loader:loader:1.0.0] /home/robca/.gradle/caches/8.10.2/transforms/a3a26d9eea7f5d2bc4e8a9392bab63db/transformed/loader-1.0.0/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.lifecycle:lifecycle-viewmodel:2.5.1] /home/robca/.gradle/caches/8.10.2/transforms/4322254dae9b55119fe75c35748dcbe0/transformed/lifecycle-viewmodel-2.5.1/AndroidManifest.xml:17:1-24:12
+MERGED from [androidx.lifecycle:lifecycle-viewmodel-savedstate:2.5.1] /home/robca/.gradle/caches/8.10.2/transforms/c86608ec76844b995dd3bd514c301c00/transformed/jetified-lifecycle-viewmodel-savedstate-2.5.1/AndroidManifest.xml:17:1-24:12
+MERGED from [androidx.core:core-ktx:1.12.0] /home/robca/.gradle/caches/8.10.2/transforms/fe7ae6739bfa4a002aaba24a08bce167/transformed/jetified-core-ktx-1.12.0/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.vectordrawable:vectordrawable-animated:1.1.0] /home/robca/.gradle/caches/8.10.2/transforms/ac402fbd99e1ac0b95d0824606747dc8/transformed/vectordrawable-animated-1.1.0/AndroidManifest.xml:17:1-24:12
+MERGED from [androidx.vectordrawable:vectordrawable:1.1.0] /home/robca/.gradle/caches/8.10.2/transforms/54316979dc7d4affb8f247583b99f892/transformed/vectordrawable-1.1.0/AndroidManifest.xml:17:1-24:12
+MERGED from [androidx.viewpager:viewpager:1.0.0] /home/robca/.gradle/caches/8.10.2/transforms/9cc0fe2c3a53129662ff50bb1509f107/transformed/viewpager-1.0.0/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.customview:customview:1.0.0] /home/robca/.gradle/caches/8.10.2/transforms/ebbd7ca051dd17e409ce3ccccb1f7714/transformed/customview-1.0.0/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.core:core:1.12.0] /home/robca/.gradle/caches/8.10.2/transforms/92d06ed5b14b2e93b263a2634017b904/transformed/core-1.12.0/AndroidManifest.xml:17:1-30:12
+MERGED from [androidx.cursoradapter:cursoradapter:1.0.0] /home/robca/.gradle/caches/8.10.2/transforms/30823c736fce659d6c4e470f0f4e6a0e/transformed/cursoradapter-1.0.0/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.lifecycle:lifecycle-process:2.4.1] /home/robca/.gradle/caches/8.10.2/transforms/39143f3eee82918a26c0d600c8f21fcb/transformed/jetified-lifecycle-process-2.4.1/AndroidManifest.xml:17:1-37:12
+MERGED from [androidx.lifecycle:lifecycle-runtime:2.5.1] /home/robca/.gradle/caches/8.10.2/transforms/80bf3f834d7516d6ac310d7d82500fb3/transformed/lifecycle-runtime-2.5.1/AndroidManifest.xml:17:1-24:12
+MERGED from [androidx.savedstate:savedstate:1.2.0] /home/robca/.gradle/caches/8.10.2/transforms/011016826143b31763da9d577913c6c9/transformed/jetified-savedstate-1.2.0/AndroidManifest.xml:17:1-24:12
+MERGED from [androidx.interpolator:interpolator:1.0.0] /home/robca/.gradle/caches/8.10.2/transforms/918e7c269ea911fb9167f3db83902ef0/transformed/interpolator-1.0.0/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.versionedparcelable:versionedparcelable:1.1.1] /home/robca/.gradle/caches/8.10.2/transforms/e8a27b07aaf9a09f743d9d92c6b6912f/transformed/versionedparcelable-1.1.1/AndroidManifest.xml:17:1-27:12
+MERGED from [androidx.startup:startup-runtime:1.1.1] /home/robca/.gradle/caches/8.10.2/transforms/37db50319e7f9c60bc6e6215476531b0/transformed/jetified-startup-runtime-1.1.1/AndroidManifest.xml:17:1-33:12
+MERGED from [androidx.tracing:tracing:1.0.0] /home/robca/.gradle/caches/8.10.2/transforms/6994927bc84e7d178eba70ceaabb30e4/transformed/jetified-tracing-1.0.0/AndroidManifest.xml:17:1-24:12
+MERGED from [androidx.lifecycle:lifecycle-livedata:2.0.0] /home/robca/.gradle/caches/8.10.2/transforms/2861834e4e0bc8f19c33612133ab9ae4/transformed/lifecycle-livedata-2.0.0/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.lifecycle:lifecycle-livedata-core:2.5.1] /home/robca/.gradle/caches/8.10.2/transforms/1c465ccffeb412a80ddb30e5f2149a2f/transformed/lifecycle-livedata-core-2.5.1/AndroidManifest.xml:17:1-24:12
+MERGED from [androidx.arch.core:core-runtime:2.1.0] /home/robca/.gradle/caches/8.10.2/transforms/f1c8985b46b4ab508517c208d1ccb45d/transformed/core-runtime-2.1.0/AndroidManifest.xml:17:1-24:12
+MERGED from [androidx.annotation:annotation-experimental:1.3.0] /home/robca/.gradle/caches/8.10.2/transforms/524145064969dcf7aba388a46d955de0/transformed/jetified-annotation-experimental-1.3.0/AndroidManifest.xml:17:1-22:12
+	package
+		INJECTED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml
+	android:versionName
+		INJECTED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml
+	android:versionCode
+		INJECTED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml
+	xmlns:android
+		ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:2:11-69
+uses-feature#android.hardware.usb.host
+ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:4:5-86
+	android:required
+		ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:4:60-83
+	android:name
+		ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:4:19-59
+uses-permission#android.permission.FOREGROUND_SERVICE
+ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:5:5-77
+	android:name
+		ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:5:22-74
+application
+ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:7:5-38:19
+INJECTED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:7:5-38:19
+MERGED from [androidx.emoji2:emoji2:1.2.0] /home/robca/.gradle/caches/8.10.2/transforms/cbbd37dd9caa8e1da1ea6744dbdcfd04/transformed/jetified-emoji2-1.2.0/AndroidManifest.xml:23:5-33:19
+MERGED from [androidx.emoji2:emoji2:1.2.0] /home/robca/.gradle/caches/8.10.2/transforms/cbbd37dd9caa8e1da1ea6744dbdcfd04/transformed/jetified-emoji2-1.2.0/AndroidManifest.xml:23:5-33:19
+MERGED from [androidx.core:core:1.12.0] /home/robca/.gradle/caches/8.10.2/transforms/92d06ed5b14b2e93b263a2634017b904/transformed/core-1.12.0/AndroidManifest.xml:28:5-89
+MERGED from [androidx.core:core:1.12.0] /home/robca/.gradle/caches/8.10.2/transforms/92d06ed5b14b2e93b263a2634017b904/transformed/core-1.12.0/AndroidManifest.xml:28:5-89
+MERGED from [androidx.lifecycle:lifecycle-process:2.4.1] /home/robca/.gradle/caches/8.10.2/transforms/39143f3eee82918a26c0d600c8f21fcb/transformed/jetified-lifecycle-process-2.4.1/AndroidManifest.xml:25:5-35:19
+MERGED from [androidx.lifecycle:lifecycle-process:2.4.1] /home/robca/.gradle/caches/8.10.2/transforms/39143f3eee82918a26c0d600c8f21fcb/transformed/jetified-lifecycle-process-2.4.1/AndroidManifest.xml:25:5-35:19
+MERGED from [androidx.versionedparcelable:versionedparcelable:1.1.1] /home/robca/.gradle/caches/8.10.2/transforms/e8a27b07aaf9a09f743d9d92c6b6912f/transformed/versionedparcelable-1.1.1/AndroidManifest.xml:24:5-25:19
+MERGED from [androidx.versionedparcelable:versionedparcelable:1.1.1] /home/robca/.gradle/caches/8.10.2/transforms/e8a27b07aaf9a09f743d9d92c6b6912f/transformed/versionedparcelable-1.1.1/AndroidManifest.xml:24:5-25:19
+MERGED from [androidx.startup:startup-runtime:1.1.1] /home/robca/.gradle/caches/8.10.2/transforms/37db50319e7f9c60bc6e6215476531b0/transformed/jetified-startup-runtime-1.1.1/AndroidManifest.xml:25:5-31:19
+MERGED from [androidx.startup:startup-runtime:1.1.1] /home/robca/.gradle/caches/8.10.2/transforms/37db50319e7f9c60bc6e6215476531b0/transformed/jetified-startup-runtime-1.1.1/AndroidManifest.xml:25:5-31:19
+	android:extractNativeLibs
+		INJECTED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml
+	android:appComponentFactory
+		ADDED from [androidx.core:core:1.12.0] /home/robca/.gradle/caches/8.10.2/transforms/92d06ed5b14b2e93b263a2634017b904/transformed/core-1.12.0/AndroidManifest.xml:28:18-86
+	android:supportsRtl
+		ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:11:9-35
+	android:label
+		ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:9:9-39
+	android:allowBackup
+		ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:8:9-35
+	android:theme
+		ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:10:9-59
+activity#com.obd2.lambda.MainActivity
+ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:13:9-32:20
+	android:screenOrientation
+		ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:16:13-49
+	android:exported
+		ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:15:13-36
+	android:configChanges
+		ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:17:13-59
+	android:name
+		ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:14:13-41
+intent-filter#action:name:android.intent.action.MAIN+category:name:android.intent.category.LAUNCHER
+ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:19:13-22:29
+action#android.intent.action.MAIN
+ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:20:17-69
+	android:name
+		ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:20:25-66
+category#android.intent.category.LAUNCHER
+ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:21:17-77
+	android:name
+		ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:21:27-74
+intent-filter#action:name:android.hardware.usb.action.USB_DEVICE_ATTACHED
+ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:25:13-27:29
+action#android.hardware.usb.action.USB_DEVICE_ATTACHED
+ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:26:17-90
+	android:name
+		ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:26:25-87
+meta-data#android.hardware.usb.action.USB_DEVICE_ATTACHED
+ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:29:13-31:57
+	android:resource
+		ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:31:17-54
+	android:name
+		ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:30:17-79
+service#com.obd2.lambda.OBD2ForegroundService
+ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:34:9-37:63
+	android:exported
+		ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:36:13-37
+	android:foregroundServiceType
+		ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:37:13-60
+	android:name
+		ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:35:13-50
+uses-sdk
+INJECTED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml reason: use-sdk injection requested
+INJECTED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml
+INJECTED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml
+MERGED from [androidx.appcompat:appcompat-resources:1.6.1] /home/robca/.gradle/caches/8.10.2/transforms/eda811fbee4fa48fb11a2e276a557355/transformed/jetified-appcompat-resources-1.6.1/AndroidManifest.xml:20:5-44
+MERGED from [androidx.appcompat:appcompat-resources:1.6.1] /home/robca/.gradle/caches/8.10.2/transforms/eda811fbee4fa48fb11a2e276a557355/transformed/jetified-appcompat-resources-1.6.1/AndroidManifest.xml:20:5-44
+MERGED from [androidx.appcompat:appcompat:1.6.1] /home/robca/.gradle/caches/8.10.2/transforms/2cabc5eed3dd2e9bc3fe41840b7685d5/transformed/appcompat-1.6.1/AndroidManifest.xml:20:5-44
+MERGED from [androidx.appcompat:appcompat:1.6.1] /home/robca/.gradle/caches/8.10.2/transforms/2cabc5eed3dd2e9bc3fe41840b7685d5/transformed/appcompat-1.6.1/AndroidManifest.xml:20:5-44
+MERGED from [com.github.mik3y:usb-serial-for-android:3.7.3] /home/robca/.gradle/caches/8.10.2/transforms/319c7470fd833b597ec30170c8952604/transformed/jetified-usb-serial-for-android-3.7.3/AndroidManifest.xml:5:5-44
+MERGED from [com.github.mik3y:usb-serial-for-android:3.7.3] /home/robca/.gradle/caches/8.10.2/transforms/319c7470fd833b597ec30170c8952604/transformed/jetified-usb-serial-for-android-3.7.3/AndroidManifest.xml:5:5-44
+MERGED from [androidx.fragment:fragment:1.3.6] /home/robca/.gradle/caches/8.10.2/transforms/a34b636c2f9947389e5c45e9233601fd/transformed/fragment-1.3.6/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.fragment:fragment:1.3.6] /home/robca/.gradle/caches/8.10.2/transforms/a34b636c2f9947389e5c45e9233601fd/transformed/fragment-1.3.6/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.activity:activity:1.6.0] /home/robca/.gradle/caches/8.10.2/transforms/6d251d19b590ebe156b63e0f0cc52cda/transformed/jetified-activity-1.6.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.activity:activity:1.6.0] /home/robca/.gradle/caches/8.10.2/transforms/6d251d19b590ebe156b63e0f0cc52cda/transformed/jetified-activity-1.6.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.drawerlayout:drawerlayout:1.0.0] /home/robca/.gradle/caches/8.10.2/transforms/0c596bf8699928c31b15ad577008b3cf/transformed/drawerlayout-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.drawerlayout:drawerlayout:1.0.0] /home/robca/.gradle/caches/8.10.2/transforms/0c596bf8699928c31b15ad577008b3cf/transformed/drawerlayout-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.emoji2:emoji2-views-helper:1.2.0] /home/robca/.gradle/caches/8.10.2/transforms/5701d09b76ed63c5c37fd8088c8bae74/transformed/jetified-emoji2-views-helper-1.2.0/AndroidManifest.xml:5:5-44
+MERGED from [androidx.emoji2:emoji2-views-helper:1.2.0] /home/robca/.gradle/caches/8.10.2/transforms/5701d09b76ed63c5c37fd8088c8bae74/transformed/jetified-emoji2-views-helper-1.2.0/AndroidManifest.xml:5:5-44
+MERGED from [androidx.emoji2:emoji2:1.2.0] /home/robca/.gradle/caches/8.10.2/transforms/cbbd37dd9caa8e1da1ea6744dbdcfd04/transformed/jetified-emoji2-1.2.0/AndroidManifest.xml:21:5-44
+MERGED from [androidx.emoji2:emoji2:1.2.0] /home/robca/.gradle/caches/8.10.2/transforms/cbbd37dd9caa8e1da1ea6744dbdcfd04/transformed/jetified-emoji2-1.2.0/AndroidManifest.xml:21:5-44
+MERGED from [androidx.loader:loader:1.0.0] /home/robca/.gradle/caches/8.10.2/transforms/a3a26d9eea7f5d2bc4e8a9392bab63db/transformed/loader-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.loader:loader:1.0.0] /home/robca/.gradle/caches/8.10.2/transforms/a3a26d9eea7f5d2bc4e8a9392bab63db/transformed/loader-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.lifecycle:lifecycle-viewmodel:2.5.1] /home/robca/.gradle/caches/8.10.2/transforms/4322254dae9b55119fe75c35748dcbe0/transformed/lifecycle-viewmodel-2.5.1/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.lifecycle:lifecycle-viewmodel:2.5.1] /home/robca/.gradle/caches/8.10.2/transforms/4322254dae9b55119fe75c35748dcbe0/transformed/lifecycle-viewmodel-2.5.1/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.lifecycle:lifecycle-viewmodel-savedstate:2.5.1] /home/robca/.gradle/caches/8.10.2/transforms/c86608ec76844b995dd3bd514c301c00/transformed/jetified-lifecycle-viewmodel-savedstate-2.5.1/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.lifecycle:lifecycle-viewmodel-savedstate:2.5.1] /home/robca/.gradle/caches/8.10.2/transforms/c86608ec76844b995dd3bd514c301c00/transformed/jetified-lifecycle-viewmodel-savedstate-2.5.1/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.core:core-ktx:1.12.0] /home/robca/.gradle/caches/8.10.2/transforms/fe7ae6739bfa4a002aaba24a08bce167/transformed/jetified-core-ktx-1.12.0/AndroidManifest.xml:5:5-44
+MERGED from [androidx.core:core-ktx:1.12.0] /home/robca/.gradle/caches/8.10.2/transforms/fe7ae6739bfa4a002aaba24a08bce167/transformed/jetified-core-ktx-1.12.0/AndroidManifest.xml:5:5-44
+MERGED from [androidx.vectordrawable:vectordrawable-animated:1.1.0] /home/robca/.gradle/caches/8.10.2/transforms/ac402fbd99e1ac0b95d0824606747dc8/transformed/vectordrawable-animated-1.1.0/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.vectordrawable:vectordrawable-animated:1.1.0] /home/robca/.gradle/caches/8.10.2/transforms/ac402fbd99e1ac0b95d0824606747dc8/transformed/vectordrawable-animated-1.1.0/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.vectordrawable:vectordrawable:1.1.0] /home/robca/.gradle/caches/8.10.2/transforms/54316979dc7d4affb8f247583b99f892/transformed/vectordrawable-1.1.0/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.vectordrawable:vectordrawable:1.1.0] /home/robca/.gradle/caches/8.10.2/transforms/54316979dc7d4affb8f247583b99f892/transformed/vectordrawable-1.1.0/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.viewpager:viewpager:1.0.0] /home/robca/.gradle/caches/8.10.2/transforms/9cc0fe2c3a53129662ff50bb1509f107/transformed/viewpager-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.viewpager:viewpager:1.0.0] /home/robca/.gradle/caches/8.10.2/transforms/9cc0fe2c3a53129662ff50bb1509f107/transformed/viewpager-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.customview:customview:1.0.0] /home/robca/.gradle/caches/8.10.2/transforms/ebbd7ca051dd17e409ce3ccccb1f7714/transformed/customview-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.customview:customview:1.0.0] /home/robca/.gradle/caches/8.10.2/transforms/ebbd7ca051dd17e409ce3ccccb1f7714/transformed/customview-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.core:core:1.12.0] /home/robca/.gradle/caches/8.10.2/transforms/92d06ed5b14b2e93b263a2634017b904/transformed/core-1.12.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.core:core:1.12.0] /home/robca/.gradle/caches/8.10.2/transforms/92d06ed5b14b2e93b263a2634017b904/transformed/core-1.12.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.cursoradapter:cursoradapter:1.0.0] /home/robca/.gradle/caches/8.10.2/transforms/30823c736fce659d6c4e470f0f4e6a0e/transformed/cursoradapter-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.cursoradapter:cursoradapter:1.0.0] /home/robca/.gradle/caches/8.10.2/transforms/30823c736fce659d6c4e470f0f4e6a0e/transformed/cursoradapter-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.lifecycle:lifecycle-process:2.4.1] /home/robca/.gradle/caches/8.10.2/transforms/39143f3eee82918a26c0d600c8f21fcb/transformed/jetified-lifecycle-process-2.4.1/AndroidManifest.xml:21:5-23:41
+MERGED from [androidx.lifecycle:lifecycle-process:2.4.1] /home/robca/.gradle/caches/8.10.2/transforms/39143f3eee82918a26c0d600c8f21fcb/transformed/jetified-lifecycle-process-2.4.1/AndroidManifest.xml:21:5-23:41
+MERGED from [androidx.lifecycle:lifecycle-runtime:2.5.1] /home/robca/.gradle/caches/8.10.2/transforms/80bf3f834d7516d6ac310d7d82500fb3/transformed/lifecycle-runtime-2.5.1/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.lifecycle:lifecycle-runtime:2.5.1] /home/robca/.gradle/caches/8.10.2/transforms/80bf3f834d7516d6ac310d7d82500fb3/transformed/lifecycle-runtime-2.5.1/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.savedstate:savedstate:1.2.0] /home/robca/.gradle/caches/8.10.2/transforms/011016826143b31763da9d577913c6c9/transformed/jetified-savedstate-1.2.0/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.savedstate:savedstate:1.2.0] /home/robca/.gradle/caches/8.10.2/transforms/011016826143b31763da9d577913c6c9/transformed/jetified-savedstate-1.2.0/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.interpolator:interpolator:1.0.0] /home/robca/.gradle/caches/8.10.2/transforms/918e7c269ea911fb9167f3db83902ef0/transformed/interpolator-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.interpolator:interpolator:1.0.0] /home/robca/.gradle/caches/8.10.2/transforms/918e7c269ea911fb9167f3db83902ef0/transformed/interpolator-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.versionedparcelable:versionedparcelable:1.1.1] /home/robca/.gradle/caches/8.10.2/transforms/e8a27b07aaf9a09f743d9d92c6b6912f/transformed/versionedparcelable-1.1.1/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.versionedparcelable:versionedparcelable:1.1.1] /home/robca/.gradle/caches/8.10.2/transforms/e8a27b07aaf9a09f743d9d92c6b6912f/transformed/versionedparcelable-1.1.1/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.startup:startup-runtime:1.1.1] /home/robca/.gradle/caches/8.10.2/transforms/37db50319e7f9c60bc6e6215476531b0/transformed/jetified-startup-runtime-1.1.1/AndroidManifest.xml:21:5-23:41
+MERGED from [androidx.startup:startup-runtime:1.1.1] /home/robca/.gradle/caches/8.10.2/transforms/37db50319e7f9c60bc6e6215476531b0/transformed/jetified-startup-runtime-1.1.1/AndroidManifest.xml:21:5-23:41
+MERGED from [androidx.tracing:tracing:1.0.0] /home/robca/.gradle/caches/8.10.2/transforms/6994927bc84e7d178eba70ceaabb30e4/transformed/jetified-tracing-1.0.0/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.tracing:tracing:1.0.0] /home/robca/.gradle/caches/8.10.2/transforms/6994927bc84e7d178eba70ceaabb30e4/transformed/jetified-tracing-1.0.0/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.lifecycle:lifecycle-livedata:2.0.0] /home/robca/.gradle/caches/8.10.2/transforms/2861834e4e0bc8f19c33612133ab9ae4/transformed/lifecycle-livedata-2.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.lifecycle:lifecycle-livedata:2.0.0] /home/robca/.gradle/caches/8.10.2/transforms/2861834e4e0bc8f19c33612133ab9ae4/transformed/lifecycle-livedata-2.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.lifecycle:lifecycle-livedata-core:2.5.1] /home/robca/.gradle/caches/8.10.2/transforms/1c465ccffeb412a80ddb30e5f2149a2f/transformed/lifecycle-livedata-core-2.5.1/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.lifecycle:lifecycle-livedata-core:2.5.1] /home/robca/.gradle/caches/8.10.2/transforms/1c465ccffeb412a80ddb30e5f2149a2f/transformed/lifecycle-livedata-core-2.5.1/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.arch.core:core-runtime:2.1.0] /home/robca/.gradle/caches/8.10.2/transforms/f1c8985b46b4ab508517c208d1ccb45d/transformed/core-runtime-2.1.0/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.arch.core:core-runtime:2.1.0] /home/robca/.gradle/caches/8.10.2/transforms/f1c8985b46b4ab508517c208d1ccb45d/transformed/core-runtime-2.1.0/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.annotation:annotation-experimental:1.3.0] /home/robca/.gradle/caches/8.10.2/transforms/524145064969dcf7aba388a46d955de0/transformed/jetified-annotation-experimental-1.3.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.annotation:annotation-experimental:1.3.0] /home/robca/.gradle/caches/8.10.2/transforms/524145064969dcf7aba388a46d955de0/transformed/jetified-annotation-experimental-1.3.0/AndroidManifest.xml:20:5-44
+	android:targetSdkVersion
+		INJECTED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml
+	android:minSdkVersion
+		INJECTED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml
+provider#androidx.startup.InitializationProvider
+ADDED from [androidx.emoji2:emoji2:1.2.0] /home/robca/.gradle/caches/8.10.2/transforms/cbbd37dd9caa8e1da1ea6744dbdcfd04/transformed/jetified-emoji2-1.2.0/AndroidManifest.xml:24:9-32:20
+MERGED from [androidx.lifecycle:lifecycle-process:2.4.1] /home/robca/.gradle/caches/8.10.2/transforms/39143f3eee82918a26c0d600c8f21fcb/transformed/jetified-lifecycle-process-2.4.1/AndroidManifest.xml:26:9-34:20
+MERGED from [androidx.lifecycle:lifecycle-process:2.4.1] /home/robca/.gradle/caches/8.10.2/transforms/39143f3eee82918a26c0d600c8f21fcb/transformed/jetified-lifecycle-process-2.4.1/AndroidManifest.xml:26:9-34:20
+MERGED from [androidx.startup:startup-runtime:1.1.1] /home/robca/.gradle/caches/8.10.2/transforms/37db50319e7f9c60bc6e6215476531b0/transformed/jetified-startup-runtime-1.1.1/AndroidManifest.xml:26:9-30:34
+MERGED from [androidx.startup:startup-runtime:1.1.1] /home/robca/.gradle/caches/8.10.2/transforms/37db50319e7f9c60bc6e6215476531b0/transformed/jetified-startup-runtime-1.1.1/AndroidManifest.xml:26:9-30:34
+	tools:node
+		ADDED from [androidx.emoji2:emoji2:1.2.0] /home/robca/.gradle/caches/8.10.2/transforms/cbbd37dd9caa8e1da1ea6744dbdcfd04/transformed/jetified-emoji2-1.2.0/AndroidManifest.xml:28:13-31
+	android:authorities
+		ADDED from [androidx.emoji2:emoji2:1.2.0] /home/robca/.gradle/caches/8.10.2/transforms/cbbd37dd9caa8e1da1ea6744dbdcfd04/transformed/jetified-emoji2-1.2.0/AndroidManifest.xml:26:13-68
+	android:exported
+		ADDED from [androidx.emoji2:emoji2:1.2.0] /home/robca/.gradle/caches/8.10.2/transforms/cbbd37dd9caa8e1da1ea6744dbdcfd04/transformed/jetified-emoji2-1.2.0/AndroidManifest.xml:27:13-37
+	android:name
+		ADDED from [androidx.emoji2:emoji2:1.2.0] /home/robca/.gradle/caches/8.10.2/transforms/cbbd37dd9caa8e1da1ea6744dbdcfd04/transformed/jetified-emoji2-1.2.0/AndroidManifest.xml:25:13-67
+meta-data#androidx.emoji2.text.EmojiCompatInitializer
+ADDED from [androidx.emoji2:emoji2:1.2.0] /home/robca/.gradle/caches/8.10.2/transforms/cbbd37dd9caa8e1da1ea6744dbdcfd04/transformed/jetified-emoji2-1.2.0/AndroidManifest.xml:29:13-31:52
+	android:value
+		ADDED from [androidx.emoji2:emoji2:1.2.0] /home/robca/.gradle/caches/8.10.2/transforms/cbbd37dd9caa8e1da1ea6744dbdcfd04/transformed/jetified-emoji2-1.2.0/AndroidManifest.xml:31:17-49
+	android:name
+		ADDED from [androidx.emoji2:emoji2:1.2.0] /home/robca/.gradle/caches/8.10.2/transforms/cbbd37dd9caa8e1da1ea6744dbdcfd04/transformed/jetified-emoji2-1.2.0/AndroidManifest.xml:30:17-75
+permission#${applicationId}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION
+ADDED from [androidx.core:core:1.12.0] /home/robca/.gradle/caches/8.10.2/transforms/92d06ed5b14b2e93b263a2634017b904/transformed/core-1.12.0/AndroidManifest.xml:22:5-24:47
+	android:protectionLevel
+		ADDED from [androidx.core:core:1.12.0] /home/robca/.gradle/caches/8.10.2/transforms/92d06ed5b14b2e93b263a2634017b904/transformed/core-1.12.0/AndroidManifest.xml:24:9-44
+	android:name
+		ADDED from [androidx.core:core:1.12.0] /home/robca/.gradle/caches/8.10.2/transforms/92d06ed5b14b2e93b263a2634017b904/transformed/core-1.12.0/AndroidManifest.xml:23:9-81
+permission#com.obd2.lambda.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION
+ADDED from [androidx.core:core:1.12.0] /home/robca/.gradle/caches/8.10.2/transforms/92d06ed5b14b2e93b263a2634017b904/transformed/core-1.12.0/AndroidManifest.xml:22:5-24:47
+	android:protectionLevel
+		ADDED from [androidx.core:core:1.12.0] /home/robca/.gradle/caches/8.10.2/transforms/92d06ed5b14b2e93b263a2634017b904/transformed/core-1.12.0/AndroidManifest.xml:24:9-44
+	android:name
+		ADDED from [androidx.core:core:1.12.0] /home/robca/.gradle/caches/8.10.2/transforms/92d06ed5b14b2e93b263a2634017b904/transformed/core-1.12.0/AndroidManifest.xml:23:9-81
+uses-permission#${applicationId}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION
+ADDED from [androidx.core:core:1.12.0] /home/robca/.gradle/caches/8.10.2/transforms/92d06ed5b14b2e93b263a2634017b904/transformed/core-1.12.0/AndroidManifest.xml:26:5-97
+	android:name
+		ADDED from [androidx.core:core:1.12.0] /home/robca/.gradle/caches/8.10.2/transforms/92d06ed5b14b2e93b263a2634017b904/transformed/core-1.12.0/AndroidManifest.xml:26:22-94
+uses-permission#com.obd2.lambda.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION
+ADDED from [androidx.core:core:1.12.0] /home/robca/.gradle/caches/8.10.2/transforms/92d06ed5b14b2e93b263a2634017b904/transformed/core-1.12.0/AndroidManifest.xml:26:5-97
+	android:name
+		ADDED from [androidx.core:core:1.12.0] /home/robca/.gradle/caches/8.10.2/transforms/92d06ed5b14b2e93b263a2634017b904/transformed/core-1.12.0/AndroidManifest.xml:26:22-94
+meta-data#androidx.lifecycle.ProcessLifecycleInitializer
+ADDED from [androidx.lifecycle:lifecycle-process:2.4.1] /home/robca/.gradle/caches/8.10.2/transforms/39143f3eee82918a26c0d600c8f21fcb/transformed/jetified-lifecycle-process-2.4.1/AndroidManifest.xml:31:13-33:52
+	android:value
+		ADDED from [androidx.lifecycle:lifecycle-process:2.4.1] /home/robca/.gradle/caches/8.10.2/transforms/39143f3eee82918a26c0d600c8f21fcb/transformed/jetified-lifecycle-process-2.4.1/AndroidManifest.xml:33:17-49
+	android:name
+		ADDED from [androidx.lifecycle:lifecycle-process:2.4.1] /home/robca/.gradle/caches/8.10.2/transforms/39143f3eee82918a26c0d600c8f21fcb/transformed/jetified-lifecycle-process-2.4.1/AndroidManifest.xml:32:17-78
