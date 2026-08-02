@@ -1,17 +1,16 @@
 # Lambda Monitor - App Android OBD2
 
 App nativo Android para monitorar sensores de lambda (O2 wideband) em tempo real via ELM327 USB.
+Otimizado para multimídias automotivas com tela pequena e processador lento.
 
 ## Funcionalidades
 
-- **Leitura em tempo real** dos sensores O2 wideband (Banco 1 e Banco 2)
-- **Gráfico scrolling** com histórico dos últimos 80 pontos
-- **Indicador visual**: azul (pobre/lean), verde (estequiométrico), vermelho (rico/rich)
-- **Short Fuel Trim** banco 1 e 2 com indicação por cor
-- **RPM e Avanço de ignição**
+- **Gráfico fullscreen** com sinal das duas sondas lambda em tempo real
+- **Apenas 2 PIDs** (0134 + 0138) → máxima taxa de atualização (~8-10 Hz)
+- **Indicador visual**: verde (Banco 1), vermelho (Banco 2)
 - **Log CSV automático** salvo no armazenamento do dispositivo
 - **Auto-detect** do adaptador USB quando conectado
-- **Tela sempre ligada** durante monitoramento
+- **Tela sempre ligada** + modo fullscreen immersive
 - Compatível com **Android 5.0+** (API 21)
 - **Não precisa de root** - usa USB Host API nativa
 
@@ -21,10 +20,6 @@ App nativo Android para monitorar sensores de lambda (O2 wideband) em tempo real
 |--------|----------------------------------|
 | 0x0134 | O2 Sensor 1 - Lambda + Corrente |
 | 0x0138 | O2 Sensor 5 - Lambda + Corrente |
-| 0x010C | RPM                              |
-| 0x0106 | Short Fuel Trim Banco 1          |
-| 0x0108 | Short Fuel Trim Banco 2          |
-| 0x010E | Avanço de Ignição                |
 
 ## Adaptadores compatíveis
 
@@ -36,17 +31,12 @@ Qualquer ELM327 USB com chip:
 
 ## Como compilar
 
-### Opção 1: Android Studio
-1. Abra o Android Studio
-2. File → Open → selecione a pasta `lambda_android`
-3. Aguarde o Gradle sync
-4. Run → Run 'app' (com o Android conectado via ADB)
+**Requer JDK 21** (path: `/usr/lib/jvm/java-21-openjdk-amd64`)
 
-### Opção 2: Linha de comando
+### Linha de comando (recomendado)
 ```bash
-cd lambda_android
-chmod +x gradlew
-./gradlew assembleDebug
+cd ~/obd2/lambda_android
+JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 ./gradlew assembleDebug
 ```
 O APK será gerado em `app/build/outputs/apk/debug/app-debug.apk`
 
@@ -54,6 +44,11 @@ O APK será gerado em `app/build/outputs/apk/debug/app-debug.apk`
 ```bash
 adb install app/build/outputs/apk/debug/app-debug.apk
 ```
+
+### Android Studio
+1. File → Open → selecione a pasta `lambda_android`
+2. Configure o JDK 21 em File → Project Structure → SDK Location
+3. Run → Run 'app'
 
 ## Uso
 

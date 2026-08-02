@@ -5,9 +5,9 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.graphics.Color;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
@@ -37,18 +37,21 @@ public class MainActivity extends AppCompatActivity {
 
     private static final String TAG = "LambdaMonitor";
     private static final String ACTION_USB_PERMISSION = "com.obd2.lambda.USB_PERMISSION";
-    private static final int POLL_INTERVAL_MS = 300;
+    private static final int POLL_INTERVAL_MS = 50;  // Polling rápido - PIDs já controlam ritmo
+    // Na tela do gráfico, a voltagem é lida com esta folga pra não roubar banda
+    // das leituras de lambda (que precisam ser rápidas pro ajuste em tempo real).
+    private static final int VOLTAGE_INTERVAL_MS = 3000;
 
     // UI Elements
-    private TextView tvO2S1Value, tvO2S1Status, tvO2S1Label;
-    private TextView tvO2S5Value, tvO2S5Status;
-    private TextView tvStft1, tvStft2;
-    private TextView tvRpm, tvTiming;
-    private TextView tvConnStatus, tvSampleRate;
-    private View indicatorBar;
-    private Button btnConnect;
+    private TextView tvConnStatus, tvSampleRate, tvBatteryVoltage;
+    private Button btnConnect, btnToggleScreen;
     private LambdaChartView chartView;
-    private LinearLayout layoutDash, layoutConnect;
+    private DashboardView dashboardView;
+    private View layoutDash;
+    private LinearLayout layoutConnect;
+
+    // Screen mode: false = lambda chart (default), true = dashboard
+    private boolean showingDashboard = false;
 
     // Logic
     private Elm327Manager elm327;
@@ -59,6 +62,7 @@ public class MainActivity extends AppCompatActivity {
     private boolean polling = false;
     private int sampleCount = 0;
     private long startTime = 0;
+    private long lastVoltageReadTime = 0;
 
     // CSV Logging
     private BufferedWriter csvWriter;
@@ -115,27 +119,19 @@ public class MainActivity extends AppCompatActivity {
         btnConnect = findViewById(R.id.btn_connect);
         tvConnStatus = findViewById(R.id.tv_conn_status);
 
-        tvO2S1Value = findViewById(R.id.tv_o2s1_value);
-        tvO2S1Status = findViewById(R.id.tv_o2s1_status);
-        tvO2S1Label = findViewById(R.id.tv_o2s1_label);
-
-        tvO2S5Value = findViewById(R.id.tv_o2s5_value);
-        tvO2S5Status = findViewById(R.id.tv_o2s5_status);
-
-        tvStft1 = findViewById(R.id.tv_stft1);
-        tvStft2 = findViewById(R.id.tv_stft2);
-        tvRpm = findViewById(R.id.tv_rpm);
-        tvTiming = findViewById(R.id.tv_timing);
         tvSampleRate = findViewById(R.id.tv_sample_rate);
-        indicatorBar = findViewById(R.id.indicator_bar);
+        tvBatteryVoltage = findViewById(R.id.tv_battery_voltage);
 
         chartView = findViewById(R.id.chart_view);
+        dashboardView = findViewById(R.id.dashboard_view);
+        btnToggleScreen = findViewById(R.id.btn_toggle_screen);
 
         btnConnect.setOnClickListener(v -> requestConnection());
         findViewById(R.id.btn_disconnect).setOnClickListener(v -> {
             stopPolling();
             showConnectView();
         });
+        btnToggleScreen.setOnClickListener(v -> toggleScreen());
     }
 
     private void registerReceivers() {
@@ -168,9 +164,11 @@ public class MainActivity extends AppCompatActivity {
         } else {
             btnConnect.setEnabled(false);
             btnConnect.setText("Aguardando permissão...");
+            int pendingFlags = (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M)
+                    ? PendingIntent.FLAG_IMMUTABLE : 0;
             PendingIntent pi = PendingIntent.getBroadcast(this, 0,
                     new Intent(ACTION_USB_PERMISSION),
-                    PendingIntent.FLAG_IMMUTABLE);
+                    pendingFlags);
             usbManager.requestPermission(device, pi);
         }
     }
@@ -205,6 +203,7 @@ public class MainActivity extends AppCompatActivity {
         polling = true;
         sampleCount = 0;
         startTime = System.currentTimeMillis();
+        lastVoltageReadTime = 0;  // lê a voltagem já no primeiro ciclo do gráfico
 
         pollThread = new HandlerThread("OBD2Poll");
         pollThread.start();
@@ -217,10 +216,25 @@ public class MainActivity extends AppCompatActivity {
         public void run() {
             if (!polling || !elm327.isConnected()) return;
 
-            final Elm327Manager.LambdaData data = elm327.readLambdaData();
-            sampleCount++;
+            if (showingDashboard) {
+                final Elm327Manager.DashboardData data = elm327.readDashboardData();
+                sampleCount++;
+                uiHandler.post(() -> updateDashboardUI(data));
+            } else {
+                final Elm327Manager.LambdaData data = elm327.readLambdaData();
+                sampleCount++;
+                uiHandler.post(() -> updateUI(data));
 
-            uiHandler.post(() -> updateUI(data));
+                // Voltagem em baixa frequência na tela do gráfico: uma leitura
+                // ATRV (leve, local do ELM327) a cada VOLTAGE_INTERVAL_MS, pra
+                // manter a taxa de lambda alta.
+                long now = System.currentTimeMillis();
+                if (now - lastVoltageReadTime >= VOLTAGE_INTERVAL_MS) {
+                    lastVoltageReadTime = now;
+                    final Float v = elm327.readBatteryVoltage();
+                    if (v != null) uiHandler.post(() -> setBatteryVoltage(v));
+                }
+            }
 
             if (polling) {
                 pollHandler.postDelayed(this, POLL_INTERVAL_MS);
@@ -248,75 +262,44 @@ public class MainActivity extends AppCompatActivity {
             tvSampleRate.setText(String.format(Locale.US, "%.1f Hz", hz));
         }
 
-        // O2 S1 (principal)
-        if (data.o2s1Current != null) {
-            tvO2S1Value.setText(String.format(Locale.US, "%.3f mA", data.o2s1Current));
-            String status = data.getO2S1Status();
-            tvO2S1Status.setText(status);
-
-            int bgColor, borderColor;
-            switch (status) {
-                case "POBRE":
-                    bgColor = Color.parseColor("#1A3A5C");
-                    borderColor = Color.parseColor("#2196F3");
-                    tvO2S1Value.setTextColor(Color.parseColor("#64B5F6"));
-                    break;
-                case "RICO":
-                    bgColor = Color.parseColor("#5C1A1A");
-                    borderColor = Color.parseColor("#F44336");
-                    tvO2S1Value.setTextColor(Color.parseColor("#EF5350"));
-                    break;
-                default: // ESTEQUIO
-                    bgColor = Color.parseColor("#1A3C1A");
-                    borderColor = Color.parseColor("#4CAF50");
-                    tvO2S1Value.setTextColor(Color.parseColor("#81C784"));
-                    break;
-            }
-            indicatorBar.setBackgroundColor(borderColor);
-        } else {
-            tvO2S1Value.setText("--");
-            tvO2S1Status.setText("SEM DADOS");
-        }
-
-        // O2 S5
-        if (data.o2s5Current != null) {
-            tvO2S5Value.setText(String.format(Locale.US, "%.3f mA", data.o2s5Current));
-            tvO2S5Status.setText(data.o2s5Current < -0.01f ? "POBRE" :
-                    data.o2s5Current <= 0.01f ? "ESTEQUIO" : "RICO");
-        } else {
-            tvO2S5Value.setText("--");
-            tvO2S5Status.setText("--");
-        }
-
-        // Fuel trims
-        tvStft1.setText(data.stft1 != null ? String.format(Locale.US, "%.1f%%", data.stft1) : "--");
-        tvStft2.setText(data.stft2 != null ? String.format(Locale.US, "%.1f%%", data.stft2) : "--");
-
-        // Colorir fuel trims
-        colorFuelTrim(tvStft1, data.stft1);
-        colorFuelTrim(tvStft2, data.stft2);
-
-        // RPM e Timing
-        tvRpm.setText(data.rpm != null ? String.valueOf(data.rpm) : "--");
-        tvTiming.setText(data.timingAdvance != null ?
-                String.format(Locale.US, "%.1f°", data.timingAdvance) : "--");
-
-        // Chart
-        chartView.addData(data.o2s1Current, data.o2s5Current);
+        // Chart - só lambda, sem RPM/timing para máxima velocidade
+        chartView.addData(data.o2s1Lambda, data.o2s5Lambda, data.o2s1Current, data.o2s5Current);
 
         // CSV Log
         writeCsvLine(data);
     }
 
-    private void colorFuelTrim(TextView tv, Float val) {
-        if (val == null) {
-            tv.setTextColor(Color.parseColor("#AAAAAA"));
-        } else if (val > 5f) {
-            tv.setTextColor(Color.parseColor("#F44336")); // Vermelho - lean
-        } else if (val < -5f) {
-            tv.setTextColor(Color.parseColor("#2196F3")); // Azul - rich
+    private void updateDashboardUI(Elm327Manager.DashboardData data) {
+        // Voltagem da bateria na barra inferior
+        if (data.batteryVoltage != null) {
+            setBatteryVoltage(data.batteryVoltage);
+        }
+
+        dashboardView.updateData(data);
+    }
+
+    private void setBatteryVoltage(float v) {
+        tvBatteryVoltage.setText(String.format(Locale.US, "%.1fV", v));
+    }
+
+    private void toggleScreen() {
+        showingDashboard = !showingDashboard;
+        // Reset sample counter ao trocar de tela para Hz correto
+        sampleCount = 0;
+        startTime = System.currentTimeMillis();
+
+        // Voltagem fica visível nas duas telas; só o Hz é exclusivo do gráfico.
+        tvBatteryVoltage.setVisibility(View.VISIBLE);
+        if (showingDashboard) {
+            chartView.setVisibility(View.GONE);
+            dashboardView.setVisibility(View.VISIBLE);
+            btnToggleScreen.setText("λ");
+            tvSampleRate.setVisibility(View.GONE);
         } else {
-            tv.setTextColor(Color.parseColor("#4CAF50")); // Verde - ok
+            chartView.setVisibility(View.VISIBLE);
+            dashboardView.setVisibility(View.GONE);
+            btnToggleScreen.setText("⚙");
+            tvSampleRate.setVisibility(View.VISIBLE);
         }
     }
 
@@ -326,11 +309,39 @@ public class MainActivity extends AppCompatActivity {
         btnConnect.setEnabled(true);
         btnConnect.setText("CONECTAR");
         chartView.clearData();
+        dashboardView.clearData();
+        // Reset para tela de lambda como padrão
+        showingDashboard = false;
+        chartView.setVisibility(View.VISIBLE);
+        dashboardView.setVisibility(View.GONE);
+        btnToggleScreen.setText("⚙");
     }
 
     private void showDashView() {
         layoutConnect.setVisibility(View.GONE);
         layoutDash.setVisibility(View.VISIBLE);
+        enableFullscreen();
+
+        // Toque na tela re-ativa fullscreen (para quando volta de outro app)
+        chartView.setOnClickListener(v -> enableFullscreen());
+    }
+
+    private void enableFullscreen() {
+        getWindow().getDecorView().setSystemUiVisibility(
+                View.SYSTEM_UI_FLAG_FULLSCREEN
+                | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN);
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus && layoutDash.getVisibility() == View.VISIBLE) {
+            enableFullscreen();
+        }
     }
 
     private void showStatus(String msg) {

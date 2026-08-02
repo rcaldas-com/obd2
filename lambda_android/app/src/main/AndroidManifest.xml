@@ -33,8 +33,7 @@
 
         <service
             android:name=".OBD2ForegroundService"
-            android:exported="false"
-            android:foregroundServiceType="connectedDevice" />
+            android:exported="false" />
     </application>
 
 </manifest>

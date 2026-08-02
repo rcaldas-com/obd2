@@ -8,7 +8,7 @@ android {
 
     defaultConfig {
         applicationId "com.obd2.lambda"
-        minSdk 28
+        minSdk 21
         targetSdk 34
         versionCode 1
         versionName "1.0"
@@ -19,6 +19,17 @@ android {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
+    }
+
+    signingConfigs {
+        debug {
+            // Forçar v1+v2 signing para compatibilidade com multimídias automotivas
+        }
+    }
+
+    packagingOptions {
+        // Evitar conflitos de arquivos duplicados
+        exclude 'META-INF/DEPENDENCIES'
     }
 
     compileOptions {

@@ -31,8 +31,10 @@ public class OBD2ForegroundService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         Intent notificationIntent = new Intent(this, MainActivity.class);
+        int pendingFlags = (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M)
+                ? PendingIntent.FLAG_IMMUTABLE : 0;
         PendingIntent pendingIntent = PendingIntent.getActivity(this, 0,
-                notificationIntent, PendingIntent.FLAG_IMMUTABLE);
+                notificationIntent, pendingFlags);
 
         Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setContentTitle("Lambda Monitor")
@@ -64,14 +66,16 @@ public class OBD2ForegroundService extends Service {
     }
 
     private void createNotificationChannel() {
-        NotificationChannel channel = new NotificationChannel(
-                CHANNEL_ID,
-                "Lambda Monitor",
-                NotificationManager.IMPORTANCE_LOW); // Sem som
-        channel.setDescription("Monitoramento OBD2 em tempo real");
-        NotificationManager manager = getSystemService(NotificationManager.class);
-        if (manager != null) {
-            manager.createNotificationChannel(channel);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel channel = new NotificationChannel(
+                    CHANNEL_ID,
+                    "Lambda Monitor",
+                    NotificationManager.IMPORTANCE_LOW); // Sem som
+            channel.setDescription("Monitoramento OBD2 em tempo real");
+            NotificationManager manager = getSystemService(NotificationManager.class);
+            if (manager != null) {
+                manager.createNotificationChannel(channel);
+            }
         }
     }
 

@@ -22,7 +22,7 @@ public class Elm327Manager {
     private static final String TAG = "ELM327";
     private static final int BAUD_RATE = 38400;
     private static final int TIMEOUT_MS = 2000;
-    private static final int READ_TIMEOUT_MS = 1000;
+    private static final int READ_TIMEOUT_MS = 400;  // Reduzido para respostas mais rápidas
 
     private UsbSerialPort port;
     private UsbDeviceConnection connection;
@@ -40,11 +40,22 @@ public class Elm327Manager {
         public long timestamp;
 
         public String getO2S1Status() {
-            if (o2s1Current == null) return "SEM DADOS";
-            if (o2s1Current < -0.01f) return "POBRE";
-            if (o2s1Current <= 0.01f) return "ESTEQUIO";
-            return "RICO";
+            if (o2s1Lambda == null) return "SEM DADOS";
+            if (o2s1Lambda > 1.02f) return "POBRE";
+            if (o2s1Lambda < 0.98f) return "RICO";
+            return "ESTEQUIO";
         }
+    }
+
+    public static class DashboardData {
+        public Integer rpm;
+        public Float coolantTemp;     // °C - PID 0105
+        public Float intakeAirTemp;   // °C - PID 010F
+        public Integer speed;         // km/h - PID 010D
+        public Float timingAdvance;   // ° - PID 010E
+        public Float tps;             // % - PID 0111 (absoluto)
+        public Float batteryVoltage;  // V - AT RV
+        public long timestamp;
     }
 
     /**
@@ -100,6 +111,12 @@ public class Elm327Manager {
         sendCommand("ATH0");         // Headers off
         readResponse();
 
+        sendCommand("ATAT2");        // Adaptive timing agressivo - respostas mais rápidas
+        readResponse();
+
+        sendCommand("ATST0A");       // Timeout curto (10 * 4ms = 40ms por tentativa)
+        readResponse();
+
         sendCommand("ATSP0");        // Auto protocol
         readResponse();
 
@@ -107,7 +124,7 @@ public class Elm327Manager {
         sendCommand("0100");
         readResponse();
 
-        Log.i(TAG, "ELM327 inicializado com sucesso");
+        Log.i(TAG, "ELM327 inicializado (modo rápido)");
     }
 
     /**
@@ -130,8 +147,13 @@ public class Elm327Manager {
                     int b = Integer.parseInt(hex.substring(2, 4), 16);
                     int c = Integer.parseInt(hex.substring(4, 6), 16);
                     int d = Integer.parseInt(hex.substring(6, 8), 16);
-                    data.o2s1Lambda = (2.0f / 65536f) * (256 * a + b);
                     data.o2s1Current = ((256f * c + d) / 256f) - 128f;
+                    // Conversão mA→lambda igual ao script Python
+                    if (data.o2s1Current <= 0) {
+                        data.o2s1Lambda = 1.0f + (data.o2s1Current * 0.25f);
+                    } else {
+                        data.o2s1Lambda = 1.0f + (data.o2s1Current * 0.5f);
+                    }
                 }
             }
         } catch (Exception e) {
@@ -148,19 +170,40 @@ public class Elm327Manager {
                     int b = Integer.parseInt(hex.substring(2, 4), 16);
                     int c = Integer.parseInt(hex.substring(4, 6), 16);
                     int d = Integer.parseInt(hex.substring(6, 8), 16);
-                    data.o2s5Lambda = (2.0f / 65536f) * (256 * a + b);
                     data.o2s5Current = ((256f * c + d) / 256f) - 128f;
+                    // Conversão mA→lambda igual ao script Python
+                    if (data.o2s5Current <= 0) {
+                        data.o2s5Lambda = 1.0f + (data.o2s5Current * 0.25f);
+                    } else {
+                        data.o2s5Lambda = 1.0f + (data.o2s5Current * 0.5f);
+                    }
                 }
             }
         } catch (Exception e) {
             Log.w(TAG, "Erro PID 0138: " + e.getMessage());
         }
 
+        // PIDs 010C (RPM), 0106/0108 (STFT), 010E (Timing) removidos
+        // Apenas 2 PIDs (0134 + 0138) = máxima taxa de atualização lambda
+
+        return data;
+    }
+
+    /**
+     * Lê dados do dashboard: RPM, temp água, temp ar, baro, ponto, TPS.
+     * Chamado apenas quando a tela de dashboard está ativa.
+     */
+    public DashboardData readDashboardData() {
+        DashboardData data = new DashboardData();
+        data.timestamp = System.currentTimeMillis();
+
+        if (!connected || port == null) return data;
+
         // PID 010C - RPM
         try {
             String resp = queryPid("010C");
-            if (resp != null && resp.length() >= 8) {
-                String hex = resp.replace("410C", "").trim();
+            if (resp != null) {
+                String hex = resp.replaceAll("^.*410C", "").trim();
                 if (hex.length() >= 4) {
                     int a = Integer.parseInt(hex.substring(0, 2), 16);
                     int b = Integer.parseInt(hex.substring(2, 4), 16);
@@ -171,39 +214,53 @@ public class Elm327Manager {
             Log.w(TAG, "Erro PID 010C: " + e.getMessage());
         }
 
-        // PID 0106 - Short Fuel Trim Bank 1
+        // PID 0105 - Coolant Temperature
         try {
-            String resp = queryPid("0106");
-            if (resp != null && resp.length() >= 6) {
-                String hex = resp.replace("4106", "").trim();
+            String resp = queryPid("0105");
+            if (resp != null) {
+                String hex = resp.replaceAll("^.*4105", "").trim();
                 if (hex.length() >= 2) {
                     int a = Integer.parseInt(hex.substring(0, 2), 16);
-                    data.stft1 = (a / 1.28f) - 100f;
+                    data.coolantTemp = a - 40f;
                 }
             }
         } catch (Exception e) {
-            Log.w(TAG, "Erro PID 0106: " + e.getMessage());
+            Log.w(TAG, "Erro PID 0105: " + e.getMessage());
         }
 
-        // PID 0108 - Short Fuel Trim Bank 2
+        // PID 010F - Intake Air Temperature
         try {
-            String resp = queryPid("0108");
-            if (resp != null && resp.length() >= 6) {
-                String hex = resp.replace("4108", "").trim();
+            String resp = queryPid("010F");
+            if (resp != null) {
+                String hex = resp.replaceAll("^.*410F", "").trim();
                 if (hex.length() >= 2) {
                     int a = Integer.parseInt(hex.substring(0, 2), 16);
-                    data.stft2 = (a / 1.28f) - 100f;
+                    data.intakeAirTemp = a - 40f;
                 }
             }
         } catch (Exception e) {
-            Log.w(TAG, "Erro PID 0108: " + e.getMessage());
+            Log.w(TAG, "Erro PID 010F: " + e.getMessage());
+        }
+
+        // PID 010D - Vehicle Speed
+        try {
+            String resp = queryPid("010D");
+            if (resp != null) {
+                String hex = resp.replaceAll("^.*410D", "").trim();
+                if (hex.length() >= 2) {
+                    int a = Integer.parseInt(hex.substring(0, 2), 16);
+                    data.speed = a;
+                }
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Erro PID 010D: " + e.getMessage());
         }
 
         // PID 010E - Timing Advance
         try {
             String resp = queryPid("010E");
-            if (resp != null && resp.length() >= 6) {
-                String hex = resp.replace("410E", "").trim();
+            if (resp != null) {
+                String hex = resp.replaceAll("^.*410E", "").trim();
                 if (hex.length() >= 2) {
                     int a = Integer.parseInt(hex.substring(0, 2), 16);
                     data.timingAdvance = (a / 2.0f) - 64f;
@@ -213,7 +270,45 @@ public class Elm327Manager {
             Log.w(TAG, "Erro PID 010E: " + e.getMessage());
         }
 
+        // PID 0111 - Throttle Position (absoluto)
+        try {
+            String resp = queryPid("0111");
+            if (resp != null) {
+                String hex = resp.replaceAll("^.*4111", "").trim();
+                if (hex.length() >= 2) {
+                    int a = Integer.parseInt(hex.substring(0, 2), 16);
+                    data.tps = (a * 100f) / 255f;
+                }
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Erro PID 0111: " + e.getMessage());
+        }
+
+        // Voltagem da bateria (comando ELM327 local, leve)
+        data.batteryVoltage = readBatteryVoltage();
+
         return data;
+    }
+
+    /**
+     * Lê só a voltagem da bateria via comando ATRV do ELM327. É um comando
+     * LOCAL do adaptador (não consulta a ECU), então é leve — pode ser chamado
+     * na tela do gráfico em baixa frequência sem prejudicar a taxa do lambda.
+     */
+    public Float readBatteryVoltage() {
+        if (!connected || port == null) return null;
+        try {
+            sendCommand("ATRV");
+            String resp = readResponse();
+            if (resp != null) {
+                // Resposta tipo "12.6V" / "12.6v" seguida de ">"
+                String cleaned = resp.replaceAll("[\\r\\n>\\s]", "").toUpperCase().replace("V", "");
+                if (!cleaned.isEmpty()) return Float.parseFloat(cleaned);
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Erro ATRV: " + e.getMessage());
+        }
+        return null;
     }
 
     /**

@@ -4,7 +4,7 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:background="#1A1A2E"
-    android:padding="8dp">
+    android:padding="0dp">
 
     <!-- ===== TELA DE CONEXÃO ===== -->
     <LinearLayout
@@ -54,268 +54,91 @@
     </LinearLayout>
 
     <!-- ===== DASHBOARD ===== -->
-    <LinearLayout
+    <RelativeLayout
         android:id="@+id/layout_dash"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:orientation="vertical"
         android:visibility="gone">
 
-        <!-- Barra de status -->
+        <!-- Barra inferior mínima: Hz + disconnect -->
         <LinearLayout
+            android:id="@+id/layout_bottom_bar"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_alignParentBottom="true"
             android:orientation="horizontal"
+            android:background="@android:color/transparent"
             android:gravity="center_vertical"
-            android:layout_marginBottom="4dp">
-
-            <TextView
-                android:id="@+id/tv_sample_rate"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="-- Hz"
-                android:textColor="#888888"
-                android:textSize="12sp"/>
+            android:paddingLeft="8dp"
+            android:paddingRight="8dp"
+            android:paddingTop="2dp"
+            android:paddingBottom="2dp">
 
             <Button
                 android:id="@+id/btn_disconnect"
-                android:layout_width="wrap_content"
-                android:layout_height="32dp"
-                android:text="DESCONECTAR"
-                android:textSize="11sp"
+                android:layout_width="72dp"
+                android:layout_height="72dp"
+                android:text="✕"
+                android:textSize="36sp"
                 android:textColor="#FF5252"
                 android:background="@android:color/transparent"
                 android:minWidth="0dp"
-                android:paddingLeft="8dp"
-                android:paddingRight="8dp"/>
-        </LinearLayout>
+                android:minHeight="0dp"
+                android:gravity="center"
+                android:padding="0dp"/>
 
-        <!-- ===== VALOR PRINCIPAL O2 S1 ===== -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:background="#1A3C1A"
-            android:padding="12dp"
-            android:layout_marginBottom="4dp">
+            <View
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:layout_weight="1"/>
 
             <TextView
-                android:id="@+id/tv_o2s1_label"
+                android:id="@+id/tv_battery_voltage"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="LAMBDA BANCO 1 (O2 S1)"
-                android:textColor="#88FFFFFF"
-                android:textSize="12sp"/>
+                android:text=""
+                android:textColor="#55FFFFFF"
+                android:textSize="56sp"/>
 
             <TextView
-                android:id="@+id/tv_o2s1_value"
-                android:layout_width="match_parent"
+                android:id="@+id/tv_sample_rate"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="--"
-                android:textColor="#81C784"
-                android:textSize="48sp"
-                android:textStyle="bold"
-                android:gravity="center"/>
+                android:text="-- Hz"
+                android:textColor="#55FFFFFF"
+                android:textSize="12sp"
+                android:layout_marginLeft="12dp"/>
 
-            <TextView
-                android:id="@+id/tv_o2s1_status"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="AGUARDANDO..."
-                android:textColor="#88FFFFFF"
-                android:textSize="14sp"
-                android:gravity="center"/>
-
-            <!-- Barra indicadora -->
-            <View
-                android:id="@+id/indicator_bar"
-                android:layout_width="match_parent"
-                android:layout_height="6dp"
-                android:layout_marginTop="6dp"
-                android:background="#4CAF50"/>
+            <Button
+                android:id="@+id/btn_toggle_screen"
+                android:layout_width="72dp"
+                android:layout_height="72dp"
+                android:text="⚙"
+                android:textSize="28sp"
+                android:textColor="#55FFFFFF"
+                android:background="@android:color/transparent"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:gravity="center"
+                android:padding="0dp"
+                android:layout_marginLeft="8dp"/>
         </LinearLayout>
 
-        <!-- ===== GRID: O2 S5 + FUEL TRIMS ===== -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginBottom="4dp">
-
-            <!-- O2 S5 -->
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:orientation="vertical"
-                android:background="#2A2A3E"
-                android:padding="8dp"
-                android:layout_marginRight="2dp">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="BANCO 2 (O2 S5)"
-                    android:textColor="#88FFFFFF"
-                    android:textSize="10sp"/>
-
-                <TextView
-                    android:id="@+id/tv_o2s5_value"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="--"
-                    android:textColor="#EEEEEE"
-                    android:textSize="22sp"
-                    android:textStyle="bold"
-                    android:gravity="center"/>
-
-                <TextView
-                    android:id="@+id/tv_o2s5_status"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="--"
-                    android:textColor="#88FFFFFF"
-                    android:textSize="12sp"
-                    android:gravity="center"/>
-            </LinearLayout>
-
-            <!-- Fuel Trims -->
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:orientation="vertical"
-                android:background="#2A2A3E"
-                android:padding="8dp"
-                android:layout_marginLeft="2dp">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal">
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="vertical"
-                        android:gravity="center">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="STFT B1"
-                            android:textColor="#88FFFFFF"
-                            android:textSize="10sp"/>
-
-                        <TextView
-                            android:id="@+id/tv_stft1"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="--"
-                            android:textColor="#EEEEEE"
-                            android:textSize="18sp"
-                            android:textStyle="bold"/>
-                    </LinearLayout>
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="vertical"
-                        android:gravity="center">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="STFT B2"
-                            android:textColor="#88FFFFFF"
-                            android:textSize="10sp"/>
-
-                        <TextView
-                            android:id="@+id/tv_stft2"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="--"
-                            android:textColor="#EEEEEE"
-                            android:textSize="18sp"
-                            android:textStyle="bold"/>
-                    </LinearLayout>
-                </LinearLayout>
-            </LinearLayout>
-        </LinearLayout>
-
-        <!-- ===== GRÁFICO ===== -->
+        <!-- Gráfico ocupa todo o espaço acima da barra inferior -->
         <com.obd2.lambda.LambdaChartView
             android:id="@+id/chart_view"
             android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
-            android:layout_marginBottom="4dp"/>
+            android:layout_height="match_parent"
+            android:layout_above="@id/layout_bottom_bar"/>
 
-        <!-- ===== DADOS EXTRAS ===== -->
-        <LinearLayout
+        <!-- Dashboard ocupa o mesmo espaço, começa invisível -->
+        <com.obd2.lambda.DashboardView
+            android:id="@+id/dashboard_view"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginBottom="4dp">
+            android:layout_height="match_parent"
+            android:layout_above="@id/layout_bottom_bar"
+            android:visibility="gone"/>
 
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:orientation="vertical"
-                android:background="#2A2A3E"
-                android:padding="6dp"
-                android:gravity="center"
-                android:layout_marginRight="2dp">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="RPM"
-                    android:textColor="#88FFFFFF"
-                    android:textSize="10sp"/>
-
-                <TextView
-                    android:id="@+id/tv_rpm"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="--"
-                    android:textColor="#EEEEEE"
-                    android:textSize="20sp"
-                    android:textStyle="bold"/>
-            </LinearLayout>
-
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:orientation="vertical"
-                android:background="#2A2A3E"
-                android:padding="6dp"
-                android:gravity="center"
-                android:layout_marginLeft="2dp">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="AVANÇO"
-                    android:textColor="#88FFFFFF"
-                    android:textSize="10sp"/>
-
-                <TextView
-                    android:id="@+id/tv_timing"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="--"
-                    android:textColor="#EEEEEE"
-                    android:textSize="20sp"
-                    android:textStyle="bold"/>
-            </LinearLayout>
-        </LinearLayout>
-
-    </LinearLayout>
+    </RelativeLayout>
 
 </LinearLayout>

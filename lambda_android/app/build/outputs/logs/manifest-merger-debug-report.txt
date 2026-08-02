@@ -1,9 +1,9 @@
 -- Merging decision tree log ---
 manifest
-ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:2:1-40:12
-INJECTED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:2:1-40:12
-INJECTED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:2:1-40:12
-INJECTED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:2:1-40:12
+ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:2:1-39:12
+INJECTED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:2:1-39:12
+INJECTED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:2:1-39:12
+INJECTED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:2:1-39:12
 MERGED from [androidx.appcompat:appcompat-resources:1.6.1] /home/robca/.gradle/caches/8.10.2/transforms/eda811fbee4fa48fb11a2e276a557355/transformed/jetified-appcompat-resources-1.6.1/AndroidManifest.xml:17:1-22:12
 MERGED from [androidx.appcompat:appcompat:1.6.1] /home/robca/.gradle/caches/8.10.2/transforms/2cabc5eed3dd2e9bc3fe41840b7685d5/transformed/appcompat-1.6.1/AndroidManifest.xml:17:1-22:12
 MERGED from [com.github.mik3y:usb-serial-for-android:3.7.3] /home/robca/.gradle/caches/8.10.2/transforms/319c7470fd833b597ec30170c8952604/transformed/jetified-usb-serial-for-android-3.7.3/AndroidManifest.xml:2:1-7:12
@@ -52,8 +52,8 @@ ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:5:5-
 	android:name
 		ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:5:22-74
 application
-ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:7:5-38:19
-INJECTED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:7:5-38:19
+ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:7:5-37:19
+INJECTED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:7:5-37:19
 MERGED from [androidx.emoji2:emoji2:1.2.0] /home/robca/.gradle/caches/8.10.2/transforms/cbbd37dd9caa8e1da1ea6744dbdcfd04/transformed/jetified-emoji2-1.2.0/AndroidManifest.xml:23:5-33:19
 MERGED from [androidx.emoji2:emoji2:1.2.0] /home/robca/.gradle/caches/8.10.2/transforms/cbbd37dd9caa8e1da1ea6744dbdcfd04/transformed/jetified-emoji2-1.2.0/AndroidManifest.xml:23:5-33:19
 MERGED from [androidx.core:core:1.12.0] /home/robca/.gradle/caches/8.10.2/transforms/92d06ed5b14b2e93b263a2634017b904/transformed/core-1.12.0/AndroidManifest.xml:28:5-89
@@ -109,11 +109,9 @@ ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:29:1
 	android:name
 		ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:30:17-79
 service#com.obd2.lambda.OBD2ForegroundService
-ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:34:9-37:63
+ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:34:9-36:40
 	android:exported
 		ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:36:13-37
-	android:foregroundServiceType
-		ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:37:13-60
 	android:name
 		ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:35:13-50
 uses-sdk
