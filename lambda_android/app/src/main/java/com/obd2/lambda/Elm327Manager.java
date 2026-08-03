@@ -11,6 +11,7 @@ import com.hoho.android.usbserial.driver.UsbSerialProber;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -214,19 +215,7 @@ public class Elm327Manager {
             Log.w(TAG, "Erro PID 010C: " + e.getMessage());
         }
 
-        // PID 0105 - Coolant Temperature
-        try {
-            String resp = queryPid("0105");
-            if (resp != null) {
-                String hex = resp.replaceAll("^.*4105", "").trim();
-                if (hex.length() >= 2) {
-                    int a = Integer.parseInt(hex.substring(0, 2), 16);
-                    data.coolantTemp = a - 40f;
-                }
-            }
-        } catch (Exception e) {
-            Log.w(TAG, "Erro PID 0105: " + e.getMessage());
-        }
+        data.coolantTemp = readCoolantTemp();
 
         // PID 010F - Intake Air Temperature
         try {
@@ -291,6 +280,29 @@ public class Elm327Manager {
     }
 
     /**
+     * Lê só a temperatura do líquido de arrefecimento (PID 0105, 1 byte). Como
+     * é uma consulta única e rápida, pode ser chamada na tela do gráfico em
+     * baixa frequência (junto com a voltagem) para os alertas funcionarem
+     * independente da tela ativa, sem prejudicar a taxa de leitura do lambda.
+     */
+    public Float readCoolantTemp() {
+        if (!connected || port == null) return null;
+        try {
+            String resp = queryPid("0105");
+            if (resp != null) {
+                String hex = resp.replaceAll("^.*4105", "").trim();
+                if (hex.length() >= 2) {
+                    int a = Integer.parseInt(hex.substring(0, 2), 16);
+                    return a - 40f;
+                }
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Erro PID 0105: " + e.getMessage());
+        }
+        return null;
+    }
+
+    /**
      * Lê só a voltagem da bateria via comando ATRV do ELM327. É um comando
      * LOCAL do adaptador (não consulta a ECU), então é leve — pode ser chamado
      * na tela do gráfico em baixa frequência sem prejudicar a taxa do lambda.
@@ -312,9 +324,72 @@ public class Elm327Manager {
     }
 
     /**
+     * Consulta quais PIDs padrão (Modo 01) a ECU conectada realmente suporta,
+     * varrendo os PIDs de "suporte" (0100, 0120, 0140, ...) — cada resposta é
+     * um bitmask de 32 PIDs, cujo último bit indica se o próximo bloco existe.
+     * Usado nas Configurações para só oferecer PIDs que o veículo confirma ter,
+     * em vez de adivinhar.
+     */
+    public List<String> querySupportedPids() {
+        List<String> supported = new ArrayList<>();
+        if (!connected || port == null) return supported;
+
+        String[] queries = {"0100", "0120", "0140", "0160", "0180", "01A0", "01C0", "01E0"};
+        for (String q : queries) {
+            String resp = queryPid(q);
+            if (resp == null) break;
+
+            String prefix = "41" + q.substring(2);
+            String hex = resp.replaceAll("^.*" + prefix, "").trim();
+            if (hex.length() < 8) break;
+
+            long mask;
+            try {
+                mask = Long.parseLong(hex.substring(0, 8), 16);
+            } catch (NumberFormatException e) {
+                break;
+            }
+
+            int baseOffset = Integer.parseInt(q.substring(2), 16);
+            for (int bit = 31; bit >= 1; bit--) {
+                if (((mask >> bit) & 1) == 1) {
+                    int pidNum = baseOffset + (32 - bit);
+                    supported.add(String.format("01%02X", pidNum));
+                }
+            }
+            boolean hasNext = (mask & 1) == 1;
+            if (!hasNext) break;
+        }
+        return supported;
+    }
+
+    /**
+     * Lê e decodifica um PID genérico (ver {@link ObdPid}) — usado pelos
+     * alertas personalizados escolhidos pelo usuário nas Configurações.
+     */
+    public Float readGenericPid(ObdPid def) {
+        if (!connected || port == null || def == null) return null;
+        try {
+            String resp = queryPid(def.pid);
+            if (resp == null) return null;
+            String prefix = "4" + def.pid.substring(2);
+            String hex = resp.replaceAll("^.*" + prefix, "").trim();
+            if (hex.length() < def.byteCount * 2) return null;
+            int[] bytes = new int[def.byteCount];
+            for (int i = 0; i < def.byteCount; i++) {
+                bytes[i] = Integer.parseInt(hex.substring(i * 2, i * 2 + 2), 16);
+            }
+            return def.decode(bytes);
+        } catch (Exception e) {
+            Log.w(TAG, "Erro PID " + def.pid + ": " + e.getMessage());
+            return null;
+        }
+    }
+
+    /**
      * Envia um PID OBD2 e retorna a resposta limpa.
      */
-    private String queryPid(String pid) {
+    public String queryPid(String pid) {
         try {
             sendCommand(pid);
             String response = readResponse();

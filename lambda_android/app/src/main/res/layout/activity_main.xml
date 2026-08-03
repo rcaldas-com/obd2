@@ -60,7 +60,7 @@
         android:layout_height="match_parent"
         android:visibility="gone">
 
-        <!-- Barra inferior mínima: Hz + disconnect -->
+        <!-- Barra inferior mínima: voltagem + alternar tela + configurações + desconectar -->
         <LinearLayout
             android:id="@+id/layout_bottom_bar"
             android:layout_width="match_parent"
@@ -98,16 +98,7 @@
                 android:layout_height="wrap_content"
                 android:text=""
                 android:textColor="#55FFFFFF"
-                android:textSize="56sp"/>
-
-            <TextView
-                android:id="@+id/tv_sample_rate"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="-- Hz"
-                android:textColor="#55FFFFFF"
-                android:textSize="12sp"
-                android:layout_marginLeft="12dp"/>
+                android:textSize="28sp"/>
 
             <Button
                 android:id="@+id/btn_toggle_screen"
@@ -122,6 +113,19 @@
                 android:gravity="center"
                 android:padding="0dp"
                 android:layout_marginLeft="8dp"/>
+
+            <Button
+                android:id="@+id/btn_open_settings"
+                android:layout_width="72dp"
+                android:layout_height="72dp"
+                android:text="☰"
+                android:textSize="28sp"
+                android:textColor="#55FFFFFF"
+                android:background="@android:color/transparent"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:gravity="center"
+                android:padding="0dp"/>
         </LinearLayout>
 
         <!-- Gráfico ocupa todo o espaço acima da barra inferior -->
@@ -139,6 +143,221 @@
             android:layout_above="@id/layout_bottom_bar"
             android:visibility="gone"/>
 
+        <!-- Alertas: tarjas vermelhas empilhadas, centralizadas na tela,
+             sobre qualquer tela ativa (gráfico ou dashboard). Fica por último
+             para desenhar por cima; vazio quando não há alerta (sem altura,
+             sem interceptar toque). -->
+        <LinearLayout
+            android:id="@+id/layout_alerts"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_centerVertical="true"
+            android:orientation="vertical"/>
+
     </RelativeLayout>
+
+    <!-- ===== CONFIGURAÇÕES DE ALERTA (long-press no botão ⚙/λ) ===== -->
+    <ScrollView
+        android:id="@+id/layout_alert_settings"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone">
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="center_horizontal"
+        android:padding="24dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Configurações de Alerta"
+            android:textColor="#EEEEEE"
+            android:textSize="22sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="20dp"/>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Tensão mínima (V)"
+            android:textColor="#AAAAAA"
+            android:textSize="14sp"/>
+        <EditText
+            android:id="@+id/et_voltage_min"
+            android:layout_width="160dp"
+            android:layout_height="wrap_content"
+            android:inputType="numberDecimal"
+            android:textColor="#EEEEEE"
+            android:textSize="18sp"
+            android:gravity="center"
+            android:layout_marginBottom="16dp"/>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Temperatura máxima (°C)"
+            android:textColor="#AAAAAA"
+            android:textSize="14sp"/>
+        <EditText
+            android:id="@+id/et_temp_max"
+            android:layout_width="160dp"
+            android:layout_height="wrap_content"
+            android:inputType="numberDecimal"
+            android:textColor="#EEEEEE"
+            android:textSize="18sp"
+            android:gravity="center"
+            android:layout_marginBottom="20dp"/>
+
+        <Button
+            android:id="@+id/btn_save_alert_settings"
+            android:layout_width="200dp"
+            android:layout_height="52dp"
+            android:text="SALVAR"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:background="#2196F3"
+            android:textColor="#FFFFFF"
+            android:layout_marginBottom="20dp"/>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#2A3A5C"
+            android:layout_marginBottom="16dp"/>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Alertas personalizados"
+            android:textColor="#EEEEEE"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="8dp"/>
+
+        <!-- Preenchido dinamicamente com os alertas personalizados já configurados -->
+        <LinearLayout
+            android:id="@+id/layout_custom_rules"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginBottom="12dp"/>
+
+        <Button
+            android:id="@+id/btn_add_custom_alert"
+            android:layout_width="240dp"
+            android:layout_height="48dp"
+            android:text="+ Adicionar alerta"
+            android:textSize="14sp"
+            android:background="#37474F"
+            android:textColor="#EEEEEE"
+            android:layout_marginBottom="24dp"/>
+
+        <Button
+            android:id="@+id/btn_close_alert_settings"
+            android:layout_width="200dp"
+            android:layout_height="wrap_content"
+            android:text="Voltar"
+            android:textSize="14sp"
+            android:background="@android:color/transparent"
+            android:textColor="#888888"/>
+    </LinearLayout>
+    </ScrollView>
+
+    <!-- ===== ADICIONAR ALERTA PERSONALIZADO (escolha de PID) ===== -->
+    <ScrollView
+        android:id="@+id/layout_pid_picker"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone">
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="center_horizontal"
+        android:padding="24dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Adicionar Alerta"
+            android:textColor="#EEEEEE"
+            android:textSize="22sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="16dp"/>
+
+        <TextView
+            android:id="@+id/tv_pid_search_status"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Buscando PIDs suportados pelo veículo..."
+            android:textColor="#AAAAAA"
+            android:textSize="14sp"
+            android:gravity="center"
+            android:layout_marginBottom="12dp"/>
+
+        <Spinner
+            android:id="@+id/spinner_pid"
+            android:layout_width="260dp"
+            android:layout_height="wrap_content"
+            android:visibility="gone"
+            android:layout_marginBottom="8dp"/>
+
+        <TextView
+            android:id="@+id/tv_pid_live_value"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text=""
+            android:textColor="#4CAF50"
+            android:textSize="24sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="16dp"/>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Disparar quando o valor estiver:"
+            android:textColor="#AAAAAA"
+            android:textSize="14sp"/>
+        <Spinner
+            android:id="@+id/spinner_direction"
+            android:layout_width="200dp"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"/>
+
+        <EditText
+            android:id="@+id/et_custom_threshold"
+            android:layout_width="160dp"
+            android:layout_height="wrap_content"
+            android:inputType="numberDecimal|numberSigned"
+            android:textColor="#EEEEEE"
+            android:textSize="18sp"
+            android:gravity="center"
+            android:hint="Limiar"
+            android:textColorHint="#666666"
+            android:layout_marginBottom="20dp"/>
+
+        <Button
+            android:id="@+id/btn_confirm_add_custom_alert"
+            android:layout_width="200dp"
+            android:layout_height="52dp"
+            android:text="ADICIONAR"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:background="#2196F3"
+            android:textColor="#FFFFFF"
+            android:layout_marginBottom="12dp"/>
+
+        <Button
+            android:id="@+id/btn_cancel_custom_alert"
+            android:layout_width="200dp"
+            android:layout_height="wrap_content"
+            android:text="Cancelar"
+            android:textSize="14sp"
+            android:background="@android:color/transparent"
+            android:textColor="#888888"/>
+    </LinearLayout>
+    </ScrollView>
 
 </LinearLayout>

@@ -5,6 +5,8 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.graphics.Color;
+import android.graphics.Typeface;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbManager;
 import android.os.Build;
@@ -12,10 +14,15 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.util.Log;
+import android.view.Gravity;
 import android.view.View;
 import android.view.WindowManager;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.LinearLayout;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -29,26 +36,46 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 public class MainActivity extends AppCompatActivity {
 
     private static final String TAG = "LambdaMonitor";
     private static final String ACTION_USB_PERMISSION = "com.obd2.lambda.USB_PERMISSION";
     private static final int POLL_INTERVAL_MS = 50;  // Polling rápido - PIDs já controlam ritmo
-    // Na tela do gráfico, a voltagem é lida com esta folga pra não roubar banda
-    // das leituras de lambda (que precisam ser rápidas pro ajuste em tempo real).
-    private static final int VOLTAGE_INTERVAL_MS = 3000;
+    // Na tela do gráfico, voltagem/temperatura (voltagem + PID 0105) são lidas
+    // com esta folga pra não roubar banda das leituras de lambda (que precisam
+    // ser rápidas pro ajuste em tempo real). Também é a cadência dos alertas
+    // nessa tela — pedido explicitamente em baixa frequência.
+    private static final int ALERT_CHECK_INTERVAL_MS = 3000;
 
     // UI Elements
-    private TextView tvConnStatus, tvSampleRate, tvBatteryVoltage;
+    private TextView tvConnStatus, tvBatteryVoltage;
     private Button btnConnect, btnToggleScreen;
     private LambdaChartView chartView;
     private DashboardView dashboardView;
     private View layoutDash;
     private LinearLayout layoutConnect;
+    private LinearLayout layoutAlerts;
+    private View layoutAlertSettings;
+    private EditText etVoltageMin, etTempMax;
+    private List<String> currentAlerts = Collections.emptyList();
+
+    // Adicionar alerta personalizado (escolha de PID)
+    private View layoutPidPicker;
+    private LinearLayout layoutCustomRules;
+    private TextView tvPidSearchStatus, tvPidLiveValue;
+    private Spinner spinnerPid, spinnerDirection;
+    private EditText etCustomThreshold;
+    private List<ObdPid> pidOptions = new ArrayList<>();
+    private String previewPidId = null;
+    private boolean previewRunning = false;
 
     // Screen mode: false = lambda chart (default), true = dashboard
     private boolean showingDashboard = false;
@@ -60,9 +87,8 @@ public class MainActivity extends AppCompatActivity {
     private Handler pollHandler;
     private Handler uiHandler;
     private boolean polling = false;
-    private int sampleCount = 0;
-    private long startTime = 0;
-    private long lastVoltageReadTime = 0;
+    private long lastAlertCheckTime = 0;
+    private AlertManager alertManager;
 
     // CSV Logging
     private BufferedWriter csvWriter;
@@ -104,6 +130,7 @@ public class MainActivity extends AppCompatActivity {
 
         usbManager = (UsbManager) getSystemService(USB_SERVICE);
         elm327 = new Elm327Manager();
+        alertManager = new AlertManager(this);
         uiHandler = new Handler(getMainLooper());
 
         initViews();
@@ -119,12 +146,29 @@ public class MainActivity extends AppCompatActivity {
         btnConnect = findViewById(R.id.btn_connect);
         tvConnStatus = findViewById(R.id.tv_conn_status);
 
-        tvSampleRate = findViewById(R.id.tv_sample_rate);
         tvBatteryVoltage = findViewById(R.id.tv_battery_voltage);
 
         chartView = findViewById(R.id.chart_view);
         dashboardView = findViewById(R.id.dashboard_view);
         btnToggleScreen = findViewById(R.id.btn_toggle_screen);
+
+        layoutAlerts = findViewById(R.id.layout_alerts);
+        layoutAlertSettings = findViewById(R.id.layout_alert_settings);
+        etVoltageMin = findViewById(R.id.et_voltage_min);
+        etTempMax = findViewById(R.id.et_temp_max);
+        layoutCustomRules = findViewById(R.id.layout_custom_rules);
+
+        layoutPidPicker = findViewById(R.id.layout_pid_picker);
+        tvPidSearchStatus = findViewById(R.id.tv_pid_search_status);
+        tvPidLiveValue = findViewById(R.id.tv_pid_live_value);
+        spinnerPid = findViewById(R.id.spinner_pid);
+        spinnerDirection = findViewById(R.id.spinner_direction);
+        etCustomThreshold = findViewById(R.id.et_custom_threshold);
+
+        ArrayAdapter<String> dirAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item,
+                new String[]{"Abaixo de", "Acima de"});
+        dirAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinnerDirection.setAdapter(dirAdapter);
 
         btnConnect.setOnClickListener(v -> requestConnection());
         findViewById(R.id.btn_disconnect).setOnClickListener(v -> {
@@ -132,6 +176,24 @@ public class MainActivity extends AppCompatActivity {
             showConnectView();
         });
         btnToggleScreen.setOnClickListener(v -> toggleScreen());
+        findViewById(R.id.btn_open_settings).setOnClickListener(v -> openAlertSettings());
+        findViewById(R.id.btn_save_alert_settings).setOnClickListener(v -> saveAlertSettings());
+        findViewById(R.id.btn_close_alert_settings).setOnClickListener(v -> closeAlertSettings());
+        findViewById(R.id.btn_add_custom_alert).setOnClickListener(v -> openPidPicker());
+        findViewById(R.id.btn_cancel_custom_alert).setOnClickListener(v -> closePidPicker());
+        findViewById(R.id.btn_confirm_add_custom_alert).setOnClickListener(v -> confirmAddCustomAlert());
+
+        spinnerPid.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                if (position >= 0 && position < pidOptions.size()) {
+                    startPidPreview(pidOptions.get(position).pid);
+                }
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {}
+        });
     }
 
     private void registerReceivers() {
@@ -201,9 +263,7 @@ public class MainActivity extends AppCompatActivity {
     private void startPolling() {
         if (polling) return;
         polling = true;
-        sampleCount = 0;
-        startTime = System.currentTimeMillis();
-        lastVoltageReadTime = 0;  // lê a voltagem já no primeiro ciclo do gráfico
+        lastAlertCheckTime = 0;  // lê voltagem/temperatura já no primeiro ciclo do gráfico
 
         pollThread = new HandlerThread("OBD2Poll");
         pollThread.start();
@@ -218,21 +278,32 @@ public class MainActivity extends AppCompatActivity {
 
             if (showingDashboard) {
                 final Elm327Manager.DashboardData data = elm327.readDashboardData();
-                sampleCount++;
-                uiHandler.post(() -> updateDashboardUI(data));
+                // Dashboard já lê voltagem+temperatura toda vez (não faz PIDs de
+                // lambda), então os alertas usam esses mesmos dados; só os
+                // alertas personalizados (PID à parte) fazem consulta extra.
+                final Map<String, Float> customValues = readCustomAlertValues();
+                uiHandler.post(() -> {
+                    updateDashboardUI(data);
+                    evaluateAlerts(data.batteryVoltage, data.coolantTemp, customValues);
+                });
             } else {
                 final Elm327Manager.LambdaData data = elm327.readLambdaData();
-                sampleCount++;
                 uiHandler.post(() -> updateUI(data));
 
-                // Voltagem em baixa frequência na tela do gráfico: uma leitura
-                // ATRV (leve, local do ELM327) a cada VOLTAGE_INTERVAL_MS, pra
-                // manter a taxa de lambda alta.
+                // Voltagem + temperatura + alertas personalizados em baixa
+                // frequência na tela do gráfico: consultas leves a cada
+                // ALERT_CHECK_INTERVAL_MS, pra manter a taxa de lambda alta e
+                // ainda assim os alertas funcionarem independente da tela ativa.
                 long now = System.currentTimeMillis();
-                if (now - lastVoltageReadTime >= VOLTAGE_INTERVAL_MS) {
-                    lastVoltageReadTime = now;
+                if (now - lastAlertCheckTime >= ALERT_CHECK_INTERVAL_MS) {
+                    lastAlertCheckTime = now;
                     final Float v = elm327.readBatteryVoltage();
-                    if (v != null) uiHandler.post(() -> setBatteryVoltage(v));
+                    final Float temp = elm327.readCoolantTemp();
+                    final Map<String, Float> customValues = readCustomAlertValues();
+                    uiHandler.post(() -> {
+                        if (v != null) setBatteryVoltage(v);
+                        evaluateAlerts(v, temp, customValues);
+                    });
                 }
             }
 
@@ -242,8 +313,47 @@ public class MainActivity extends AppCompatActivity {
         }
     };
 
+    /** Lê o valor atual de cada alerta personalizado configurado. Chamado só
+     * do thread de polling (nunca da UI thread) — mesma serialização de todo
+     * I/O do ELM327. */
+    private Map<String, Float> readCustomAlertValues() {
+        List<AlertManager.CustomAlertRule> rules = alertManager.getCustomRules();
+        if (rules.isEmpty()) return Collections.emptyMap();
+        Map<String, Float> values = new HashMap<>();
+        for (AlertManager.CustomAlertRule rule : rules) {
+            ObdPid def = ObdPid.get(rule.pid);
+            if (def == null) continue;
+            Float v = elm327.readGenericPid(def);
+            if (v != null) values.put(rule.pid, v);
+        }
+        return values;
+    }
+
+    // Prévia do valor ao vivo na tela "Adicionar Alerta". Postada no MESMO
+    // pollHandler (thread único de I/O serial) que o pollRunnable principal —
+    // nunca uma thread separada, pra não correr com as consultas em andamento
+    // na porta serial. Continua rodando em baixa frequência mesmo com o
+    // gráfico ativo em paralelo (interleaving seguro via fila do Handler).
+    private final Runnable pidPreviewRunnable = new Runnable() {
+        @Override
+        public void run() {
+            if (!previewRunning || previewPidId == null || !elm327.isConnected()) return;
+            ObdPid def = ObdPid.get(previewPidId);
+            final Float value = def != null ? elm327.readGenericPid(def) : null;
+            uiHandler.post(() -> {
+                if (def != null) {
+                    tvPidLiveValue.setText(value != null ? def.format(value) : "sem dado");
+                }
+            });
+            if (previewRunning) {
+                pollHandler.postDelayed(this, 1500);
+            }
+        }
+    };
+
     private void stopPolling() {
         polling = false;
+        previewRunning = false;
         if (pollThread != null) {
             pollThread.quitSafely();
             pollThread = null;
@@ -255,13 +365,6 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void updateUI(Elm327Manager.LambdaData data) {
-        // Sample rate
-        long elapsed = System.currentTimeMillis() - startTime;
-        if (elapsed > 0) {
-            float hz = sampleCount * 1000f / elapsed;
-            tvSampleRate.setText(String.format(Locale.US, "%.1f Hz", hz));
-        }
-
         // Chart - só lambda, sem RPM/timing para máxima velocidade
         chartView.addData(data.o2s1Lambda, data.o2s5Lambda, data.o2s1Current, data.o2s5Current);
 
@@ -282,24 +385,217 @@ public class MainActivity extends AppCompatActivity {
         tvBatteryVoltage.setText(String.format(Locale.US, "%.1fV", v));
     }
 
+    // ---- Alertas ----
+
+    private void evaluateAlerts(Float voltage, Float coolantTemp, Map<String, Float> customValues) {
+        List<String> alerts = alertManager.evaluate(voltage, coolantTemp, customValues);
+        updateAlertBanners(alerts);
+    }
+
+    /** Sincroniza as tarjas vermelhas exibidas com a lista de alertas ativos. */
+    private void updateAlertBanners(List<String> messages) {
+        if (messages.equals(currentAlerts)) return;
+        currentAlerts = messages;
+
+        layoutAlerts.removeAllViews();
+        float density = getResources().getDisplayMetrics().density;
+        for (String msg : messages) {
+            TextView banner = new TextView(this);
+            banner.setText(msg);
+            banner.setTextColor(Color.WHITE);
+            banner.setTextSize(22f);
+            banner.setTypeface(Typeface.DEFAULT_BOLD);
+            banner.setGravity(Gravity.CENTER);
+            banner.setBackgroundColor(Color.parseColor("#D32F2F"));
+            banner.setPadding(0, (int) (14 * density), 0, (int) (14 * density));
+
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            lp.topMargin = (int) (2 * density);
+            lp.bottomMargin = (int) (2 * density);
+            banner.setLayoutParams(lp);
+
+            layoutAlerts.addView(banner);
+        }
+    }
+
+    private void openAlertSettings() {
+        etVoltageMin.setText(trimZero(alertManager.getVoltageMin()));
+        etTempMax.setText(trimZero(alertManager.getTempMax()));
+        renderCustomRulesList();
+        layoutDash.setVisibility(View.GONE);
+        layoutAlertSettings.setVisibility(View.VISIBLE);
+    }
+
+    private void closeAlertSettings() {
+        layoutAlertSettings.setVisibility(View.GONE);
+        layoutDash.setVisibility(View.VISIBLE);
+        enableFullscreen();
+    }
+
+    private void saveAlertSettings() {
+        try {
+            float voltageMin = Float.parseFloat(etVoltageMin.getText().toString().trim().replace(',', '.'));
+            float tempMax = Float.parseFloat(etTempMax.getText().toString().trim().replace(',', '.'));
+            alertManager.saveSettings(voltageMin, tempMax);
+            Toast.makeText(this, "Configurações de alerta salvas", Toast.LENGTH_SHORT).show();
+            closeAlertSettings();
+        } catch (NumberFormatException e) {
+            Toast.makeText(this, "Valores inválidos", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private String trimZero(float v) {
+        String s = String.format(Locale.US, "%.1f", v);
+        return s.endsWith(".0") ? s.substring(0, s.length() - 2) : s;
+    }
+
+    /** Preenche a lista de alertas personalizados já configurados, cada um com
+     * um botão pra remover. */
+    private void renderCustomRulesList() {
+        layoutCustomRules.removeAllViews();
+        List<AlertManager.CustomAlertRule> rules = alertManager.getCustomRules();
+        float density = getResources().getDisplayMetrics().density;
+
+        if (rules.isEmpty()) {
+            TextView empty = new TextView(this);
+            empty.setText("Nenhum alerta personalizado ainda.");
+            empty.setTextColor(Color.parseColor("#666666"));
+            empty.setTextSize(13f);
+            layoutCustomRules.addView(empty);
+            return;
+        }
+
+        for (int i = 0; i < rules.size(); i++) {
+            AlertManager.CustomAlertRule rule = rules.get(i);
+            final int index = i;
+
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setPadding(0, (int) (4 * density), 0, (int) (4 * density));
+
+            TextView label = new TextView(this);
+            label.setText(rule.describe());
+            label.setTextColor(Color.parseColor("#EEEEEE"));
+            label.setTextSize(14f);
+            LinearLayout.LayoutParams labelLp = new LinearLayout.LayoutParams(
+                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+            row.addView(label, labelLp);
+
+            TextView remove = new TextView(this);
+            remove.setText("✕");
+            remove.setTextColor(Color.parseColor("#FF5252"));
+            remove.setTextSize(18f);
+            remove.setPadding((int) (12 * density), 0, (int) (4 * density), 0);
+            remove.setOnClickListener(v -> {
+                alertManager.removeCustomRule(index);
+                renderCustomRulesList();
+            });
+            row.addView(remove);
+
+            layoutCustomRules.addView(row);
+        }
+    }
+
+    // ---- Adicionar alerta personalizado (escolha de PID) ----
+
+    private void openPidPicker() {
+        spinnerPid.setVisibility(View.GONE);
+        tvPidLiveValue.setText("");
+        etCustomThreshold.setText("");
+        tvPidSearchStatus.setText("Buscando PIDs suportados pelo veículo...");
+        layoutAlertSettings.setVisibility(View.GONE);
+        layoutPidPicker.setVisibility(View.VISIBLE);
+        searchSupportedPids();
+    }
+
+    private void closePidPicker() {
+        previewRunning = false;
+        previewPidId = null;
+        layoutPidPicker.setVisibility(View.GONE);
+        layoutAlertSettings.setVisibility(View.VISIBLE);
+    }
+
+    private void searchSupportedPids() {
+        if (!elm327.isConnected() || pollHandler == null) {
+            tvPidSearchStatus.setText("Não conectado ao veículo.");
+            return;
+        }
+        // Posta no MESMO handler de I/O serial do polling principal — nunca
+        // uma thread separada, pra não correr com as consultas em andamento.
+        pollHandler.post(() -> {
+            List<String> supportedIds = elm327.querySupportedPids();
+            List<ObdPid> options = new ArrayList<>();
+            for (String pid : supportedIds) {
+                ObdPid def = ObdPid.get(pid);
+                if (def != null) options.add(def);
+            }
+            uiHandler.post(() -> showPidOptions(options));
+        });
+    }
+
+    private void showPidOptions(List<ObdPid> options) {
+        pidOptions = options;
+        if (options.isEmpty()) {
+            tvPidSearchStatus.setText("Nenhum PID reconhecido suportado por este veículo.");
+            return;
+        }
+        tvPidSearchStatus.setText("Escolha o sinal para o alerta:");
+        List<String> names = new ArrayList<>();
+        for (ObdPid def : options) names.add(def.name);
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, names);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinnerPid.setAdapter(adapter);
+        spinnerPid.setVisibility(View.VISIBLE);
+        startPidPreview(options.get(0).pid);
+    }
+
+    private void startPidPreview(String pid) {
+        previewPidId = pid;
+        tvPidLiveValue.setText("lendo...");
+        if (!previewRunning) {
+            previewRunning = true;
+            pollHandler.post(pidPreviewRunnable);
+        }
+    }
+
+    private void confirmAddCustomAlert() {
+        int position = spinnerPid.getSelectedItemPosition();
+        if (position < 0 || position >= pidOptions.size()) {
+            Toast.makeText(this, "Escolha um sinal.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        String thresholdText = etCustomThreshold.getText().toString().trim().replace(',', '.');
+        float threshold;
+        try {
+            threshold = Float.parseFloat(thresholdText);
+        } catch (NumberFormatException e) {
+            Toast.makeText(this, "Informe o limiar.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        ObdPid def = pidOptions.get(position);
+        boolean above = spinnerDirection.getSelectedItemPosition() == 1; // 0=Abaixo de, 1=Acima de
+
+        alertManager.addCustomRule(new AlertManager.CustomAlertRule(def.pid, def.name, def.unit, threshold, above));
+        Toast.makeText(this, "Alerta adicionado", Toast.LENGTH_SHORT).show();
+        closePidPicker();
+        renderCustomRulesList();
+    }
+
     private void toggleScreen() {
         showingDashboard = !showingDashboard;
-        // Reset sample counter ao trocar de tela para Hz correto
-        sampleCount = 0;
-        startTime = System.currentTimeMillis();
 
-        // Voltagem fica visível nas duas telas; só o Hz é exclusivo do gráfico.
+        // Voltagem fica visível nas duas telas.
         tvBatteryVoltage.setVisibility(View.VISIBLE);
         if (showingDashboard) {
             chartView.setVisibility(View.GONE);
             dashboardView.setVisibility(View.VISIBLE);
             btnToggleScreen.setText("λ");
-            tvSampleRate.setVisibility(View.GONE);
         } else {
             chartView.setVisibility(View.VISIBLE);
             dashboardView.setVisibility(View.GONE);
             btnToggleScreen.setText("⚙");
-            tvSampleRate.setVisibility(View.VISIBLE);
         }
     }
 
@@ -310,6 +606,7 @@ public class MainActivity extends AppCompatActivity {
         btnConnect.setText("CONECTAR");
         chartView.clearData();
         dashboardView.clearData();
+        updateAlertBanners(Collections.emptyList());
         // Reset para tela de lambda como padrão
         showingDashboard = false;
         chartView.setVisibility(View.VISIBLE);
@@ -339,7 +636,10 @@ public class MainActivity extends AppCompatActivity {
     @Override
     public void onWindowFocusChanged(boolean hasFocus) {
         super.onWindowFocusChanged(hasFocus);
-        if (hasFocus && layoutDash.getVisibility() == View.VISIBLE) {
+        boolean onDashOrSettings = layoutDash.getVisibility() == View.VISIBLE
+                || layoutAlertSettings.getVisibility() == View.VISIBLE
+                || layoutPidPicker.getVisibility() == View.VISIBLE;
+        if (hasFocus && onDashOrSettings) {
             enableFullscreen();
         }
     }
