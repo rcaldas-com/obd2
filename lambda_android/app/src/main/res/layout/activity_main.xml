@@ -87,6 +87,19 @@
                 android:gravity="center"
                 android:padding="0dp"/>
 
+            <Button
+                android:id="@+id/btn_open_settings"
+                android:layout_width="72dp"
+                android:layout_height="72dp"
+                android:text="☰"
+                android:textSize="28sp"
+                android:textColor="#55FFFFFF"
+                android:background="@android:color/transparent"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:gravity="center"
+                android:padding="0dp"/>
+
             <View
                 android:layout_width="0dp"
                 android:layout_height="0dp"
@@ -113,19 +126,6 @@
                 android:gravity="center"
                 android:padding="0dp"
                 android:layout_marginLeft="8dp"/>
-
-            <Button
-                android:id="@+id/btn_open_settings"
-                android:layout_width="72dp"
-                android:layout_height="72dp"
-                android:text="☰"
-                android:textSize="28sp"
-                android:textColor="#55FFFFFF"
-                android:background="@android:color/transparent"
-                android:minWidth="0dp"
-                android:minHeight="0dp"
-                android:gravity="center"
-                android:padding="0dp"/>
         </LinearLayout>
 
         <!-- Gráfico ocupa todo o espaço acima da barra inferior -->
@@ -143,7 +143,8 @@
             android:layout_above="@id/layout_bottom_bar"
             android:visibility="gone"/>
 
-        <!-- Alertas: tarjas vermelhas empilhadas, centralizadas na tela,
+        <!-- Alertas: tarjas vermelhas empilhadas, encostadas em cima da barra
+             inferior (fora da área central onde o lambda normalmente fica),
              sobre qualquer tela ativa (gráfico ou dashboard). Fica por último
              para desenhar por cima; vazio quando não há alerta (sem altura,
              sem interceptar toque). -->
@@ -151,7 +152,7 @@
             android:id="@+id/layout_alerts"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_centerVertical="true"
+            android:layout_above="@id/layout_bottom_bar"
             android:orientation="vertical"/>
 
     </RelativeLayout>
@@ -192,6 +193,22 @@
             android:textColor="#EEEEEE"
             android:textSize="18sp"
             android:gravity="center"
+            android:layout_marginBottom="4dp"/>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Histerese — volta ao normal X V acima do mínimo"
+            android:textColor="#777777"
+            android:textSize="12sp"/>
+        <EditText
+            android:id="@+id/et_voltage_hysteresis"
+            android:layout_width="160dp"
+            android:layout_height="wrap_content"
+            android:inputType="numberDecimal"
+            android:textColor="#EEEEEE"
+            android:textSize="18sp"
+            android:gravity="center"
             android:layout_marginBottom="16dp"/>
 
         <TextView
@@ -202,6 +219,22 @@
             android:textSize="14sp"/>
         <EditText
             android:id="@+id/et_temp_max"
+            android:layout_width="160dp"
+            android:layout_height="wrap_content"
+            android:inputType="numberDecimal"
+            android:textColor="#EEEEEE"
+            android:textSize="18sp"
+            android:gravity="center"
+            android:layout_marginBottom="4dp"/>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Histerese — volta ao normal X °C abaixo do máximo"
+            android:textColor="#777777"
+            android:textSize="12sp"/>
+        <EditText
+            android:id="@+id/et_temp_hysteresis"
             android:layout_width="160dp"
             android:layout_height="wrap_content"
             android:inputType="numberDecimal"
@@ -335,6 +368,26 @@
             android:textSize="18sp"
             android:gravity="center"
             android:hint="Limiar"
+            android:textColorHint="#666666"
+            android:layout_marginBottom="12dp"/>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Histerese (distância do limiar pra voltar ao normal)"
+            android:textColor="#777777"
+            android:textSize="12sp"
+            android:gravity="center"
+            android:layout_marginBottom="4dp"/>
+        <EditText
+            android:id="@+id/et_custom_clear_margin"
+            android:layout_width="160dp"
+            android:layout_height="wrap_content"
+            android:inputType="numberDecimal"
+            android:textColor="#EEEEEE"
+            android:textSize="18sp"
+            android:gravity="center"
+            android:hint="Automático"
             android:textColorHint="#666666"
             android:layout_marginBottom="20dp"/>
 

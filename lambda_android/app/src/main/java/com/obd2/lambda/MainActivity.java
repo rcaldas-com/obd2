@@ -64,7 +64,7 @@ public class MainActivity extends AppCompatActivity {
     private LinearLayout layoutConnect;
     private LinearLayout layoutAlerts;
     private View layoutAlertSettings;
-    private EditText etVoltageMin, etTempMax;
+    private EditText etVoltageMin, etVoltageHysteresis, etTempMax, etTempHysteresis;
     private List<String> currentAlerts = Collections.emptyList();
 
     // Adicionar alerta personalizado (escolha de PID)
@@ -72,7 +72,7 @@ public class MainActivity extends AppCompatActivity {
     private LinearLayout layoutCustomRules;
     private TextView tvPidSearchStatus, tvPidLiveValue;
     private Spinner spinnerPid, spinnerDirection;
-    private EditText etCustomThreshold;
+    private EditText etCustomThreshold, etCustomClearMargin;
     private List<ObdPid> pidOptions = new ArrayList<>();
     private String previewPidId = null;
     private boolean previewRunning = false;
@@ -155,7 +155,9 @@ public class MainActivity extends AppCompatActivity {
         layoutAlerts = findViewById(R.id.layout_alerts);
         layoutAlertSettings = findViewById(R.id.layout_alert_settings);
         etVoltageMin = findViewById(R.id.et_voltage_min);
+        etVoltageHysteresis = findViewById(R.id.et_voltage_hysteresis);
         etTempMax = findViewById(R.id.et_temp_max);
+        etTempHysteresis = findViewById(R.id.et_temp_hysteresis);
         layoutCustomRules = findViewById(R.id.layout_custom_rules);
 
         layoutPidPicker = findViewById(R.id.layout_pid_picker);
@@ -164,6 +166,7 @@ public class MainActivity extends AppCompatActivity {
         spinnerPid = findViewById(R.id.spinner_pid);
         spinnerDirection = findViewById(R.id.spinner_direction);
         etCustomThreshold = findViewById(R.id.et_custom_threshold);
+        etCustomClearMargin = findViewById(R.id.et_custom_clear_margin);
 
         ArrayAdapter<String> dirAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item,
                 new String[]{"Abaixo de", "Acima de"});
@@ -421,7 +424,9 @@ public class MainActivity extends AppCompatActivity {
 
     private void openAlertSettings() {
         etVoltageMin.setText(trimZero(alertManager.getVoltageMin()));
+        etVoltageHysteresis.setText(trimZero(alertManager.getVoltageHysteresis()));
         etTempMax.setText(trimZero(alertManager.getTempMax()));
+        etTempHysteresis.setText(trimZero(alertManager.getTempHysteresis()));
         renderCustomRulesList();
         layoutDash.setVisibility(View.GONE);
         layoutAlertSettings.setVisibility(View.VISIBLE);
@@ -436,8 +441,10 @@ public class MainActivity extends AppCompatActivity {
     private void saveAlertSettings() {
         try {
             float voltageMin = Float.parseFloat(etVoltageMin.getText().toString().trim().replace(',', '.'));
+            float voltageHysteresis = Float.parseFloat(etVoltageHysteresis.getText().toString().trim().replace(',', '.'));
             float tempMax = Float.parseFloat(etTempMax.getText().toString().trim().replace(',', '.'));
-            alertManager.saveSettings(voltageMin, tempMax);
+            float tempHysteresis = Float.parseFloat(etTempHysteresis.getText().toString().trim().replace(',', '.'));
+            alertManager.saveSettings(voltageMin, voltageHysteresis, tempMax, tempHysteresis);
             Toast.makeText(this, "Configurações de alerta salvas", Toast.LENGTH_SHORT).show();
             closeAlertSettings();
         } catch (NumberFormatException e) {
@@ -504,6 +511,7 @@ public class MainActivity extends AppCompatActivity {
         spinnerPid.setVisibility(View.GONE);
         tvPidLiveValue.setText("");
         etCustomThreshold.setText("");
+        etCustomClearMargin.setText("");
         tvPidSearchStatus.setText("Buscando PIDs suportados pelo veículo...");
         layoutAlertSettings.setVisibility(View.GONE);
         layoutPidPicker.setVisibility(View.VISIBLE);
@@ -577,7 +585,20 @@ public class MainActivity extends AppCompatActivity {
         ObdPid def = pidOptions.get(position);
         boolean above = spinnerDirection.getSelectedItemPosition() == 1; // 0=Abaixo de, 1=Acima de
 
-        alertManager.addCustomRule(new AlertManager.CustomAlertRule(def.pid, def.name, def.unit, threshold, above));
+        // Campo vazio = histerese automática (2% do limiar, mínimo 0.5) —
+        // ver AlertManager.CustomAlertRule.effectiveClearMargin().
+        Float clearMargin = null;
+        String marginText = etCustomClearMargin.getText().toString().trim().replace(',', '.');
+        if (!marginText.isEmpty()) {
+            try {
+                clearMargin = Float.parseFloat(marginText);
+            } catch (NumberFormatException e) {
+                Toast.makeText(this, "Histerese inválida.", Toast.LENGTH_SHORT).show();
+                return;
+            }
+        }
+
+        alertManager.addCustomRule(new AlertManager.CustomAlertRule(def.pid, def.name, def.unit, threshold, above, clearMargin));
         Toast.makeText(this, "Alerta adicionado", Toast.LENGTH_SHORT).show();
         closePidPicker();
         renderCustomRulesList();

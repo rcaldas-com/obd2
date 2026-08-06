@@ -16,9 +16,9 @@ import java.util.Map;
  * Limiares de alerta (voltagem baixa, temperatura alta, + alertas
  * personalizados por PID) e avaliação dos valores lidos contra eles.
  * Persistido em SharedPreferences, editável na tela de Configurações
- * (long-press no botão ⚙/λ).
+ * (botão ☰ na barra inferior).
  *
- * Usa uma pequena histerese: o alerta só desarma quando o valor volta a uma
+ * Usa histerese configurável: o alerta só desarma quando o valor volta a uma
  * margem além do limiar, não assim que cruza de volta — evita o alerta
  * piscando quando o valor oscila bem em cima do limite.
  */
@@ -26,14 +26,16 @@ public class AlertManager {
 
     private static final String PREFS = "alert_settings";
     private static final String KEY_VOLTAGE_MIN = "voltage_min";
+    private static final String KEY_VOLTAGE_HYSTERESIS = "voltage_hysteresis";
     private static final String KEY_TEMP_MAX = "temp_max";
+    private static final String KEY_TEMP_HYSTERESIS = "temp_hysteresis";
     private static final String KEY_CUSTOM_RULES = "custom_rules";
 
     public static final float DEFAULT_VOLTAGE_MIN = 13.0f;
     public static final float DEFAULT_TEMP_MAX = 105.0f;
 
-    private static final float VOLTAGE_HYSTERESIS = 0.3f;
-    private static final float TEMP_HYSTERESIS = 3f;
+    public static final float DEFAULT_VOLTAGE_HYSTERESIS = 0.3f;
+    public static final float DEFAULT_TEMP_HYSTERESIS = 3f;
 
     /** Uma regra de alerta personalizada, escolhida por PID nas Configurações. */
     public static class CustomAlertRule {
@@ -42,14 +44,22 @@ public class AlertManager {
         public final String unit;
         public final float threshold;
         public final boolean aboveTriggers; // true: alerta quando valor > limiar; false: quando valor < limiar
+        // Distância do limiar pra voltar ao normal; null = automático (2% do
+        // limiar, mínimo 0.5) — mantém regras antigas (sem esse campo) funcionando.
+        public final Float clearMargin;
         boolean active = false;       // estado da histerese, mantido entre chamadas de evaluate()
 
-        public CustomAlertRule(String pid, String name, String unit, float threshold, boolean aboveTriggers) {
+        public CustomAlertRule(String pid, String name, String unit, float threshold, boolean aboveTriggers, Float clearMargin) {
             this.pid = pid;
             this.name = name;
             this.unit = unit;
             this.threshold = threshold;
             this.aboveTriggers = aboveTriggers;
+            this.clearMargin = clearMargin;
+        }
+
+        float effectiveClearMargin() {
+            return clearMargin != null ? clearMargin : Math.max(Math.abs(threshold) * 0.02f, 0.5f);
         }
 
         public String describe() {
@@ -73,14 +83,24 @@ public class AlertManager {
         return prefs.getFloat(KEY_VOLTAGE_MIN, DEFAULT_VOLTAGE_MIN);
     }
 
+    public float getVoltageHysteresis() {
+        return prefs.getFloat(KEY_VOLTAGE_HYSTERESIS, DEFAULT_VOLTAGE_HYSTERESIS);
+    }
+
     public float getTempMax() {
         return prefs.getFloat(KEY_TEMP_MAX, DEFAULT_TEMP_MAX);
     }
 
-    public void saveSettings(float voltageMin, float tempMax) {
+    public float getTempHysteresis() {
+        return prefs.getFloat(KEY_TEMP_HYSTERESIS, DEFAULT_TEMP_HYSTERESIS);
+    }
+
+    public void saveSettings(float voltageMin, float voltageHysteresis, float tempMax, float tempHysteresis) {
         prefs.edit()
                 .putFloat(KEY_VOLTAGE_MIN, voltageMin)
+                .putFloat(KEY_VOLTAGE_HYSTERESIS, voltageHysteresis)
                 .putFloat(KEY_TEMP_MAX, tempMax)
+                .putFloat(KEY_TEMP_HYSTERESIS, tempHysteresis)
                 .apply();
     }
 
@@ -107,9 +127,10 @@ public class AlertManager {
             JSONArray arr = new JSONArray(prefs.getString(KEY_CUSTOM_RULES, "[]"));
             for (int i = 0; i < arr.length(); i++) {
                 JSONObject o = arr.getJSONObject(i);
+                Float clearMargin = o.has("clearMargin") ? (float) o.getDouble("clearMargin") : null;
                 list.add(new CustomAlertRule(
                         o.getString("pid"), o.getString("name"), o.getString("unit"),
-                        (float) o.getDouble("threshold"), o.getBoolean("above")));
+                        (float) o.getDouble("threshold"), o.getBoolean("above"), clearMargin));
             }
         } catch (JSONException ignored) {
             // Preferências corrompidas/antigas: começa vazio em vez de travar.
@@ -127,6 +148,7 @@ public class AlertManager {
                 o.put("unit", r.unit);
                 o.put("threshold", r.threshold);
                 o.put("above", r.aboveTriggers);
+                if (r.clearMargin != null) o.put("clearMargin", r.clearMargin);
                 arr.put(o);
             }
         } catch (JSONException ignored) {
@@ -146,7 +168,7 @@ public class AlertManager {
         if (voltage != null) {
             float min = getVoltageMin();
             if (voltage < min) voltageActive = true;
-            else if (voltage > min + VOLTAGE_HYSTERESIS) voltageActive = false;
+            else if (voltage > min + getVoltageHysteresis()) voltageActive = false;
             if (voltageActive) {
                 alerts.add(String.format(Locale.US, "TENSÃO BAIXA: %.1fV", voltage));
             }
@@ -155,7 +177,7 @@ public class AlertManager {
         if (coolantTemp != null) {
             float max = getTempMax();
             if (coolantTemp > max) tempActive = true;
-            else if (coolantTemp < max - TEMP_HYSTERESIS) tempActive = false;
+            else if (coolantTemp < max - getTempHysteresis()) tempActive = false;
             if (tempActive) {
                 alerts.add(String.format(Locale.US, "TEMPERATURA ALTA: %.0f°C", coolantTemp));
             }
@@ -166,9 +188,7 @@ public class AlertManager {
                 Float value = customValues.get(rule.pid);
                 if (value == null) continue; // não leu neste ciclo — mantém estado anterior
 
-                // Histerese relativa (2% do limiar, mínimo 0.5) — funciona pra
-                // qualquer unidade/escala sem precisar configurar por PID.
-                float margin = Math.max(Math.abs(rule.threshold) * 0.02f, 0.5f);
+                float margin = rule.effectiveClearMargin();
                 boolean trigger = rule.aboveTriggers ? value > rule.threshold : value < rule.threshold;
                 boolean clear = rule.aboveTriggers ? value < rule.threshold - margin : value > rule.threshold + margin;
                 if (trigger) rule.active = true;
