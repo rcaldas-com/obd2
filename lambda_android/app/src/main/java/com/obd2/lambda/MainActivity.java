@@ -68,6 +68,7 @@ public class MainActivity extends AppCompatActivity {
     private LinearLayout layoutUsbDevices;
     private Button btnMslLog;
     private TextView tvMslLogStatus;
+    private boolean settingsOpenedFromConnect = false;
 
     // Adicionar alerta personalizado (escolha de PID)
     private View layoutPidPicker;
@@ -194,6 +195,7 @@ public class MainActivity extends AppCompatActivity {
         });
         btnToggleScreen.setOnClickListener(v -> toggleScreen());
         findViewById(R.id.btn_open_settings).setOnClickListener(v -> openAlertSettings());
+        findViewById(R.id.btn_open_settings_from_connect).setOnClickListener(v -> openAlertSettings());
         findViewById(R.id.btn_save_alert_settings).setOnClickListener(v -> saveAlertSettings());
         findViewById(R.id.btn_close_alert_settings).setOnClickListener(v -> closeAlertSettings());
         findViewById(R.id.btn_add_custom_alert).setOnClickListener(v -> openPidPicker());
@@ -246,8 +248,18 @@ public class MainActivity extends AppCompatActivity {
                 break;
             }
         }
+        // Caso comum (só o ELM327, sem Speeduino): não faz sentido pedir
+        // pra configurar nada — só tem um adaptador possível, então assume
+        // ELM327 automaticamente, igual o comportamento de sempre antes de
+        // existir a atribuição de papéis. Só exige escolha manual quando há
+        // 2+ adaptadores (aí sim é ambíguo qual é qual).
+        if (!anyRoleAssigned && drivers.size() == 1) {
+            String key = deviceRoleManager.keyFor(usbManager, drivers.get(0), drivers);
+            deviceRoleManager.setRole(key, DeviceRoleManager.ROLE_ELM327);
+            anyRoleAssigned = true;
+        }
         if (!anyRoleAssigned) {
-            showStatus("Nenhum dispositivo configurado. Abra ☰ → Dispositivos USB.");
+            showStatus("Múltiplos adaptadores detectados — abra ☰ → Dispositivos USB pra escolher qual é qual.");
             return;
         }
 
@@ -564,14 +576,24 @@ public class MainActivity extends AppCompatActivity {
         renderCustomRulesList();
         renderUsbDevicesList();
         updateMslLogButtonUi();
+        // Configurações também pode ser aberta a partir da tela de conexão
+        // (antes de conectar, pra atribuir os papéis dos dispositivos USB
+        // pela primeira vez) — guarda qual tela estava visível pra voltar
+        // pra ela ao fechar, em vez de sempre assumir o dashboard.
+        settingsOpenedFromConnect = layoutConnect.getVisibility() == View.VISIBLE;
+        layoutConnect.setVisibility(View.GONE);
         layoutDash.setVisibility(View.GONE);
         layoutAlertSettings.setVisibility(View.VISIBLE);
     }
 
     private void closeAlertSettings() {
         layoutAlertSettings.setVisibility(View.GONE);
-        layoutDash.setVisibility(View.VISIBLE);
-        enableFullscreen();
+        if (settingsOpenedFromConnect) {
+            layoutConnect.setVisibility(View.VISIBLE);
+        } else {
+            layoutDash.setVisibility(View.VISIBLE);
+            enableFullscreen();
+        }
     }
 
     private void saveAlertSettings() {
