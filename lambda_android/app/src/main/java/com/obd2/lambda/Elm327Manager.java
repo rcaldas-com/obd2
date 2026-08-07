@@ -1,13 +1,9 @@
 package com.obd2.lambda;
 
-import android.hardware.usb.UsbDevice;
-import android.hardware.usb.UsbDeviceConnection;
 import android.hardware.usb.UsbManager;
 import android.util.Log;
 
 import com.hoho.android.usbserial.driver.UsbSerialDriver;
-import com.hoho.android.usbserial.driver.UsbSerialPort;
-import com.hoho.android.usbserial.driver.UsbSerialProber;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -25,8 +21,7 @@ public class Elm327Manager {
     private static final int TIMEOUT_MS = 2000;
     private static final int READ_TIMEOUT_MS = 400;  // Reduzido para respostas mais rápidas
 
-    private UsbSerialPort port;
-    private UsbDeviceConnection connection;
+    private final UsbSerialSession session = new UsbSerialSession();
     private boolean connected = false;
 
     public static class LambdaData {
@@ -53,36 +48,22 @@ public class Elm327Manager {
         public Float coolantTemp;     // °C - PID 0105
         public Float intakeAirTemp;   // °C - PID 010F
         public Integer speed;         // km/h - PID 010D
-        public Float timingAdvance;   // ° - PID 010E
+        // Sem ponto de ignição aqui: quem comanda a ignição de verdade agora
+        // é a Speeduino, não a ECU original — ver SpeeduinoManager. O ponto
+        // original (PID 010E) ainda é lido, só que separado (readStockTimingAdvance),
+        // usado apenas como referência no log .msl (MslLogger), não no dashboard.
         public Float tps;             // % - PID 0111 (absoluto)
         public Float batteryVoltage;  // V - AT RV
         public long timestamp;
     }
 
     /**
-     * Conecta ao primeiro dispositivo USB serial encontrado.
+     * Conecta ao driver USB já escolhido pelo chamador (a seleção de qual
+     * dispositivo é o ELM327, entre os que estiverem plugados, é feita via
+     * DeviceRoleManager — ver MainActivity).
      */
-    public String connect(UsbManager usbManager) throws IOException {
-        List<UsbSerialDriver> drivers = UsbSerialProber.getDefaultProber().findAllDrivers(usbManager);
-
-        if (drivers.isEmpty()) {
-            throw new IOException("Nenhum adaptador USB serial encontrado");
-        }
-
-        UsbSerialDriver driver = drivers.get(0);
-        UsbDevice device = driver.getDevice();
-        String deviceName = device.getDeviceName() + " (" + driver.getClass().getSimpleName() + ")";
-
-        connection = usbManager.openDevice(device);
-        if (connection == null) {
-            throw new IOException("Sem permissão USB. Reconecte o adaptador.");
-        }
-
-        port = driver.getPorts().get(0);
-        port.open(connection);
-        port.setParameters(BAUD_RATE, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE);
-        port.setDTR(true);
-        port.setRTS(true);
+    public String connect(UsbManager usbManager, UsbSerialDriver driver) throws IOException {
+        String deviceName = session.open(usbManager, driver, BAUD_RATE);
 
         connected = true;
 
@@ -135,7 +116,7 @@ public class Elm327Manager {
         LambdaData data = new LambdaData();
         data.timestamp = System.currentTimeMillis();
 
-        if (!connected || port == null) return data;
+        if (!connected || !session.isOpen()) return data;
 
         // PID 0134 - O2 Sensor 1 Wide Range (Lambda + Current)
         try {
@@ -198,7 +179,7 @@ public class Elm327Manager {
         DashboardData data = new DashboardData();
         data.timestamp = System.currentTimeMillis();
 
-        if (!connected || port == null) return data;
+        if (!connected || !session.isOpen()) return data;
 
         // PID 010C - RPM
         try {
@@ -245,20 +226,6 @@ public class Elm327Manager {
             Log.w(TAG, "Erro PID 010D: " + e.getMessage());
         }
 
-        // PID 010E - Timing Advance
-        try {
-            String resp = queryPid("010E");
-            if (resp != null) {
-                String hex = resp.replaceAll("^.*410E", "").trim();
-                if (hex.length() >= 2) {
-                    int a = Integer.parseInt(hex.substring(0, 2), 16);
-                    data.timingAdvance = (a / 2.0f) - 64f;
-                }
-            }
-        } catch (Exception e) {
-            Log.w(TAG, "Erro PID 010E: " + e.getMessage());
-        }
-
         // PID 0111 - Throttle Position (absoluto)
         try {
             String resp = queryPid("0111");
@@ -286,7 +253,7 @@ public class Elm327Manager {
      * independente da tela ativa, sem prejudicar a taxa de leitura do lambda.
      */
     public Float readCoolantTemp() {
-        if (!connected || port == null) return null;
+        if (!connected || !session.isOpen()) return null;
         try {
             String resp = queryPid("0105");
             if (resp != null) {
@@ -303,12 +270,35 @@ public class Elm327Manager {
     }
 
     /**
+     * Lê o ponto de ignição da ECU original (PID 010E) — não usado mais no
+     * dashboard (que agora mostra o ponto real da Speeduino), só serve como
+     * referência de comparação no log .msl (MslLogger), pra depois replicar
+     * manualmente o ponto original nas células do mapa da Speeduino.
+     */
+    public Float readStockTimingAdvance() {
+        if (!connected || !session.isOpen()) return null;
+        try {
+            String resp = queryPid("010E");
+            if (resp != null) {
+                String hex = resp.replaceAll("^.*410E", "").trim();
+                if (hex.length() >= 2) {
+                    int a = Integer.parseInt(hex.substring(0, 2), 16);
+                    return (a / 2.0f) - 64f;
+                }
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Erro PID 010E: " + e.getMessage());
+        }
+        return null;
+    }
+
+    /**
      * Lê só a voltagem da bateria via comando ATRV do ELM327. É um comando
      * LOCAL do adaptador (não consulta a ECU), então é leve — pode ser chamado
      * na tela do gráfico em baixa frequência sem prejudicar a taxa do lambda.
      */
     public Float readBatteryVoltage() {
-        if (!connected || port == null) return null;
+        if (!connected || !session.isOpen()) return null;
         try {
             sendCommand("ATRV");
             String resp = readResponse();
@@ -332,7 +322,7 @@ public class Elm327Manager {
      */
     public List<String> querySupportedPids() {
         List<String> supported = new ArrayList<>();
-        if (!connected || port == null) return supported;
+        if (!connected || !session.isOpen()) return supported;
 
         String[] queries = {"0100", "0120", "0140", "0160", "0180", "01A0", "01C0", "01E0"};
         for (String q : queries) {
@@ -368,7 +358,7 @@ public class Elm327Manager {
      * alertas personalizados escolhidos pelo usuário nas Configurações.
      */
     public Float readGenericPid(ObdPid def) {
-        if (!connected || port == null || def == null) return null;
+        if (!connected || !session.isOpen() || def == null) return null;
         try {
             String resp = queryPid(def.pid);
             if (resp == null) return null;
@@ -410,7 +400,7 @@ public class Elm327Manager {
 
     private void sendCommand(String cmd) throws IOException {
         String toSend = cmd + "\r";
-        port.write(toSend.getBytes(StandardCharsets.US_ASCII), TIMEOUT_MS);
+        session.write(toSend.getBytes(StandardCharsets.US_ASCII), TIMEOUT_MS);
     }
 
     private String readResponse() {
@@ -420,7 +410,7 @@ public class Elm327Manager {
 
         try {
             while (System.currentTimeMillis() < deadline) {
-                int len = port.read(buf, 200);
+                int len = session.read(buf, 200);
                 if (len > 0) {
                     sb.append(new String(buf, 0, len, StandardCharsets.US_ASCII));
                     String partial = sb.toString();
@@ -438,26 +428,17 @@ public class Elm327Manager {
     private void clearBuffer() {
         byte[] buf = new byte[256];
         try {
-            while (port.read(buf, 100) > 0) { /* drain */ }
+            while (session.read(buf, 100) > 0) { /* drain */ }
         } catch (IOException ignored) {}
     }
 
     public void disconnect() {
         connected = false;
-        if (port != null) {
-            try {
-                port.close();
-            } catch (IOException ignored) {}
-            port = null;
-        }
-        if (connection != null) {
-            connection.close();
-            connection = null;
-        }
+        session.close();
     }
 
     public boolean isConnected() {
-        return connected && port != null;
+        return connected && session.isOpen();
     }
 
     private void sleep(long ms) {

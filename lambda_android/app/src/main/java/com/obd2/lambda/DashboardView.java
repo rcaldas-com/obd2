@@ -17,14 +17,19 @@ import java.util.Locale;
  */
 public class DashboardView extends View {
 
-    // Dados atuais
+    // Dados atuais — RPM/água/ar/velocidade/TPS vêm do OBD2; ponto/MAP/baro/
+    // flex vêm da Speeduino (quem realmente comanda a ignição agora), lidos
+    // por um loop de poll independente — ver updateSpeeduinoData().
     private Integer rpm;
     private Float coolantTemp;
     private Float intakeAirTemp;
     private Integer speed;
-    private Float timingAdvance;
     private Float tps;
     private Float batteryVoltage;
+    private Float speeduinoAdvance;
+    private Float speeduinoMap;
+    private Float speeduinoBaro;
+    private Integer speeduinoFlexPct;
 
     // Paints
     private final Paint paintBg = new Paint();
@@ -99,9 +104,20 @@ public class DashboardView extends View {
         this.coolantTemp = data.coolantTemp;
         this.intakeAirTemp = data.intakeAirTemp;
         this.speed = data.speed;
-        this.timingAdvance = data.timingAdvance;
         this.tps = data.tps;
         this.batteryVoltage = data.batteryVoltage;
+        postInvalidate();
+    }
+
+    /** Atualizado por um loop de poll independente (Speeduino tem sua
+     * própria porta USB) — pode chegar em instantes diferentes de
+     * updateData(), por isso é um método separado, não parte do mesmo
+     * "pacote" de dados. */
+    public void updateSpeeduinoData(SpeeduinoManager.SpeeduinoData data) {
+        this.speeduinoAdvance = data.advanceDeg;
+        this.speeduinoMap = data.mapKpa;
+        this.speeduinoBaro = data.baroKpa;
+        this.speeduinoFlexPct = data.ethanolPct;
         postInvalidate();
     }
 
@@ -110,9 +126,18 @@ public class DashboardView extends View {
         coolantTemp = null;
         intakeAirTemp = null;
         speed = null;
-        timingAdvance = null;
         tps = null;
         batteryVoltage = null;
+        postInvalidate();
+    }
+
+    /** Chamado quando a Speeduino desconecta — os 4 gauges dela voltam a
+     * mostrar "--", os outros (OBD2) continuam como estavam. */
+    public void clearSpeeduinoData() {
+        speeduinoAdvance = null;
+        speeduinoMap = null;
+        speeduinoBaro = null;
+        speeduinoFlexPct = null;
         postInvalidate();
     }
 
@@ -124,48 +149,71 @@ public class DashboardView extends View {
 
         canvas.drawRect(0, 0, w, h, paintBg);
 
-        // Layout: 3 colunas x 2 linhas
+        // Layout: 3 colunas x 3 linhas — a 3ª linha (MAP/BARO/FLEX) vem da
+        // Speeduino, assim como o PONTO na 2ª linha (trocado do OBD2 pra
+        // Speeduino: quem comanda a ignição de verdade agora é ela).
         float pad = 8f;
         float cellW = (w - pad * 4) / 3f;
-        float cellH = (h - pad * 3) / 2f;
+        float cellH = (h - pad * 4) / 3f;
+        float row0 = pad, row1 = pad * 2 + cellH, row2 = pad * 3 + cellH * 2;
+        float col0 = pad, col1 = pad * 2 + cellW, col2 = pad * 3 + cellW * 2;
 
         // Linha 1: RPM | Temp Água | Temp Ar
-        drawGauge(canvas, pad, pad,
+        drawGauge(canvas, col0, row0,
                 cellW, cellH, "RPM",
                 rpm != null ? String.valueOf(rpm) : "--", "",
                 rpm != null ? rpm / 7000f : 0f,
                 getRpmColor(rpm));
 
-        drawGauge(canvas, pad * 2 + cellW, pad,
+        drawGauge(canvas, col1, row0,
                 cellW, cellH, "ÁGUA",
                 coolantTemp != null ? String.format(Locale.US, "%.0f", coolantTemp) : "--", "°C",
                 coolantTemp != null ? coolantTemp / 130f : 0f,
                 getCoolantColor(coolantTemp));
 
-        drawGauge(canvas, pad * 3 + cellW * 2, pad,
+        drawGauge(canvas, col2, row0,
                 cellW, cellH, "AR ADMISSÃO",
                 intakeAirTemp != null ? String.format(Locale.US, "%.0f", intakeAirTemp) : "--", "°C",
                 intakeAirTemp != null ? (intakeAirTemp + 40f) / 100f : 0f,
                 COLOR_CYAN);
 
-        // Linha 2: Velocidade | Ponto | TPS
-        drawGauge(canvas, pad, pad * 2 + cellH,
+        // Linha 2: Velocidade | Ponto (Speeduino) | TPS
+        drawGauge(canvas, col0, row1,
                 cellW, cellH, "VELOCIDADE",
                 speed != null ? String.valueOf(speed) : "--", "km/h",
                 speed != null ? speed / 200f : 0f,
                 getSpeedColor(speed));
 
-        drawGauge(canvas, pad * 2 + cellW, pad * 2 + cellH,
+        drawGauge(canvas, col1, row1,
                 cellW, cellH, "PONTO",
-                timingAdvance != null ? String.format(Locale.US, "%.1f", timingAdvance) : "--", "°",
-                timingAdvance != null ? (timingAdvance + 20f) / 60f : 0f,
-                getTimingColor(timingAdvance));
+                speeduinoAdvance != null ? String.format(Locale.US, "%.0f", speeduinoAdvance) : "--", "°",
+                speeduinoAdvance != null ? (speeduinoAdvance + 20f) / 60f : 0f,
+                getTimingColor(speeduinoAdvance));
 
-        drawGauge(canvas, pad * 3 + cellW * 2, pad * 2 + cellH,
+        drawGauge(canvas, col2, row1,
                 cellW, cellH, "TPS",
                 tps != null ? String.format(Locale.US, "%.1f", tps) : "--", "%",
                 tps != null ? tps / 100f : 0f,
                 getTpsColor(tps));
+
+        // Linha 3: MAP | BARO | FLEX (todos da Speeduino)
+        drawGauge(canvas, col0, row2,
+                cellW, cellH, "MAP",
+                speeduinoMap != null ? String.format(Locale.US, "%.0f", speeduinoMap) : "--", "kPa",
+                speeduinoMap != null ? speeduinoMap / 105f : 0f,
+                COLOR_BLUE);
+
+        drawGauge(canvas, col1, row2,
+                cellW, cellH, "BARO",
+                speeduinoBaro != null ? String.format(Locale.US, "%.0f", speeduinoBaro) : "--", "kPa",
+                speeduinoBaro != null ? speeduinoBaro / 105f : 0f,
+                COLOR_CYAN);
+
+        drawGauge(canvas, col2, row2,
+                cellW, cellH, "FLEX",
+                speeduinoFlexPct != null ? String.valueOf(speeduinoFlexPct) : "--", "% etanol",
+                speeduinoFlexPct != null ? speeduinoFlexPct / 100f : 0f,
+                COLOR_ORANGE);
     }
 
     private void drawGauge(Canvas canvas, float x, float y, float w, float h,

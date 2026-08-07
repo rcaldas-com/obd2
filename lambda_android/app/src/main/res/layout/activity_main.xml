@@ -287,6 +287,69 @@
             android:textColor="#EEEEEE"
             android:layout_marginBottom="24dp"/>
 
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#2A3A5C"
+            android:layout_marginBottom="16dp"/>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Dispositivos USB"
+            android:textColor="#EEEEEE"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="4dp"/>
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Escolha qual adaptador plugado é o ELM327 e qual é a Speeduino."
+            android:textColor="#777777"
+            android:textSize="12sp"
+            android:gravity="center"
+            android:layout_marginBottom="8dp"/>
+
+        <!-- Preenchido dinamicamente com os adaptadores USB-serial detectados -->
+        <LinearLayout
+            android:id="@+id/layout_usb_devices"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginBottom="24dp"/>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#2A3A5C"
+            android:layout_marginBottom="16dp"/>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Log combinado (.msl)"
+            android:textColor="#EEEEEE"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="8dp"/>
+        <Button
+            android:id="@+id/btn_msl_log"
+            android:layout_width="240dp"
+            android:layout_height="48dp"
+            android:text="Gravar log"
+            android:textSize="14sp"
+            android:background="#37474F"
+            android:textColor="#EEEEEE"
+            android:layout_marginBottom="8dp"/>
+        <TextView
+            android:id="@+id/tv_msl_log_status"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text=""
+            android:textColor="#AAAAAA"
+            android:textSize="13sp"
+            android:layout_marginBottom="24dp"/>
+
         <Button
             android:id="@+id/btn_close_alert_settings"
             android:layout_width="200dp"

@@ -7,7 +7,6 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.graphics.Color;
 import android.graphics.Typeface;
-import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbManager;
 import android.os.Build;
 import android.os.Bundle;
@@ -66,6 +65,9 @@ public class MainActivity extends AppCompatActivity {
     private View layoutAlertSettings;
     private EditText etVoltageMin, etVoltageHysteresis, etTempMax, etTempHysteresis;
     private List<String> currentAlerts = Collections.emptyList();
+    private LinearLayout layoutUsbDevices;
+    private Button btnMslLog;
+    private TextView tvMslLogStatus;
 
     // Adicionar alerta personalizado (escolha de PID)
     private View layoutPidPicker;
@@ -82,9 +84,15 @@ public class MainActivity extends AppCompatActivity {
 
     // Logic
     private Elm327Manager elm327;
+    private SpeeduinoManager speeduino;
+    private DeviceRoleManager deviceRoleManager;
+    private MslLogger mslLogger;
     private UsbManager usbManager;
     private HandlerThread pollThread;
     private Handler pollHandler;
+    private HandlerThread speeduinoPollThread;
+    private Handler speeduinoPollHandler;
+    private boolean speeduinoPolling = false;
     private Handler uiHandler;
     private boolean polling = false;
     private long lastAlertCheckTime = 0;
@@ -130,6 +138,9 @@ public class MainActivity extends AppCompatActivity {
 
         usbManager = (UsbManager) getSystemService(USB_SERVICE);
         elm327 = new Elm327Manager();
+        speeduino = new SpeeduinoManager();
+        deviceRoleManager = new DeviceRoleManager(this);
+        mslLogger = new MslLogger(this);
         alertManager = new AlertManager(this);
         uiHandler = new Handler(getMainLooper());
 
@@ -159,6 +170,9 @@ public class MainActivity extends AppCompatActivity {
         etTempMax = findViewById(R.id.et_temp_max);
         etTempHysteresis = findViewById(R.id.et_temp_hysteresis);
         layoutCustomRules = findViewById(R.id.layout_custom_rules);
+        layoutUsbDevices = findViewById(R.id.layout_usb_devices);
+        btnMslLog = findViewById(R.id.btn_msl_log);
+        tvMslLogStatus = findViewById(R.id.tv_msl_log_status);
 
         layoutPidPicker = findViewById(R.id.layout_pid_picker);
         tvPidSearchStatus = findViewById(R.id.tv_pid_search_status);
@@ -185,6 +199,7 @@ public class MainActivity extends AppCompatActivity {
         findViewById(R.id.btn_add_custom_alert).setOnClickListener(v -> openPidPicker());
         findViewById(R.id.btn_cancel_custom_alert).setOnClickListener(v -> closePidPicker());
         findViewById(R.id.btn_confirm_add_custom_alert).setOnClickListener(v -> confirmAddCustomAlert());
+        btnMslLog.setOnClickListener(v -> toggleMslLog());
 
         spinnerPid.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
@@ -223,43 +238,112 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
-        UsbDevice device = drivers.get(0).getDevice();
-        if (usbManager.hasPermission(device)) {
-            doConnect();
-        } else {
-            btnConnect.setEnabled(false);
-            btnConnect.setText("Aguardando permissão...");
-            int pendingFlags = (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M)
-                    ? PendingIntent.FLAG_IMMUTABLE : 0;
-            PendingIntent pi = PendingIntent.getBroadcast(this, 0,
-                    new Intent(ACTION_USB_PERMISSION),
-                    pendingFlags);
-            usbManager.requestPermission(device, pi);
+        boolean anyRoleAssigned = false;
+        for (UsbSerialDriver driver : drivers) {
+            String key = deviceRoleManager.keyFor(usbManager, driver, drivers);
+            if (!DeviceRoleManager.ROLE_NONE.equals(deviceRoleManager.getRole(key))) {
+                anyRoleAssigned = true;
+                break;
+            }
         }
+        if (!anyRoleAssigned) {
+            showStatus("Nenhum dispositivo configurado. Abra ☰ → Dispositivos USB.");
+            return;
+        }
+
+        // Pede permissão pra um dispositivo com papel atribuído por vez —
+        // fluxo padrão do Android. Ao conceder, usbPermissionReceiver chama
+        // requestConnection() de novo, que segue pro próximo sem permissão
+        // até todos estarem prontos, e então cai em doConnect().
+        for (UsbSerialDriver driver : drivers) {
+            String key = deviceRoleManager.keyFor(usbManager, driver, drivers);
+            if (DeviceRoleManager.ROLE_NONE.equals(deviceRoleManager.getRole(key))) continue;
+            if (!usbManager.hasPermission(driver.getDevice())) {
+                btnConnect.setEnabled(false);
+                btnConnect.setText("Aguardando permissão...");
+                int pendingFlags = (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M)
+                        ? PendingIntent.FLAG_IMMUTABLE : 0;
+                PendingIntent pi = PendingIntent.getBroadcast(this, 0,
+                        new Intent(ACTION_USB_PERMISSION),
+                        pendingFlags);
+                usbManager.requestPermission(driver.getDevice(), pi);
+                return;
+            }
+        }
+
+        doConnect();
     }
 
     private void doConnect() {
         btnConnect.setEnabled(false);
         btnConnect.setText("Conectando...");
 
+        List<UsbSerialDriver> drivers = UsbSerialProber.getDefaultProber().findAllDrivers(usbManager);
+        UsbSerialDriver elmDriver = null;
+        UsbSerialDriver speeduinoDriver = null;
+        for (UsbSerialDriver driver : drivers) {
+            String key = deviceRoleManager.keyFor(usbManager, driver, drivers);
+            String role = deviceRoleManager.getRole(key);
+            if (DeviceRoleManager.ROLE_ELM327.equals(role)) elmDriver = driver;
+            else if (DeviceRoleManager.ROLE_SPEEDUINO.equals(role)) speeduinoDriver = driver;
+        }
+        final UsbSerialDriver finalElmDriver = elmDriver;
+        final UsbSerialDriver finalSpeeduinoDriver = speeduinoDriver;
+
+        if (finalElmDriver == null && finalSpeeduinoDriver == null) {
+            showStatus("Nenhum dos dispositivos atribuídos está plugado agora.");
+            btnConnect.setEnabled(true);
+            btnConnect.setText("CONECTAR");
+            return;
+        }
+
         new Thread(() -> {
-            try {
-                String deviceName = elm327.connect(usbManager);
-                uiHandler.post(() -> {
+            String elmDeviceName = null;
+            if (finalElmDriver != null) {
+                try {
+                    elmDeviceName = elm327.connect(usbManager, finalElmDriver);
+                } catch (IOException e) {
+                    Log.w(TAG, "Falha ao conectar ELM327: " + e.getMessage());
+                }
+            }
+            if (finalSpeeduinoDriver != null) {
+                try {
+                    speeduino.connect(usbManager, finalSpeeduinoDriver);
+                    if (!speeduino.verifySignature()) {
+                        Log.w(TAG, "Speeduino conectada mas assinatura não confere — desconectando");
+                        speeduino.disconnect();
+                    }
+                } catch (IOException e) {
+                    Log.w(TAG, "Falha ao conectar Speeduino: " + e.getMessage());
+                }
+            }
+
+            final String finalElmDeviceName = elmDeviceName;
+            uiHandler.post(() -> {
+                if (elm327.isConnected() || speeduino.isConnected()) {
                     showDashView();
-                    showStatus("Conectado: " + deviceName);
-                    startPolling();
-                    startCsvLog();
+                    StringBuilder status = new StringBuilder();
+                    if (elm327.isConnected()) status.append("Conectado: ").append(finalElmDeviceName);
+                    else if (finalElmDriver != null) status.append("Falha no ELM327");
+                    if (speeduino.isConnected()) status.append(status.length() > 0 ? " · Speeduino OK" : "Speeduino OK");
+                    else if (finalSpeeduinoDriver != null) status.append(status.length() > 0 ? " · falha na Speeduino" : "Falha na Speeduino");
+                    showStatus(status.toString());
+
+                    if (elm327.isConnected()) {
+                        startPolling();
+                        startCsvLog();
+                    }
+                    if (speeduino.isConnected()) {
+                        startSpeeduinoPolling();
+                    }
                     // Foreground service para o Android 9 não matar o app
                     startForegroundService(new Intent(MainActivity.this, OBD2ForegroundService.class));
-                });
-            } catch (IOException e) {
-                uiHandler.post(() -> {
-                    showStatus("Erro: " + e.getMessage());
+                } else {
+                    showStatus("Falha ao conectar nos dispositivos atribuídos.");
                     btnConnect.setEnabled(true);
                     btnConnect.setText("CONECTAR");
-                });
-            }
+                }
+            });
         }).start();
     }
 
@@ -302,6 +386,10 @@ public class MainActivity extends AppCompatActivity {
                     lastAlertCheckTime = now;
                     final Float v = elm327.readBatteryVoltage();
                     final Float temp = elm327.readCoolantTemp();
+                    // Ponto da ECU original — só usado como referência no
+                    // log .msl (a Speeduino é quem manda de verdade agora),
+                    // por isso lido na mesma cadência baixa da bateria/água.
+                    mslLogger.updateObd2Advance(elm327.readStockTimingAdvance());
                     final Map<String, Float> customValues = readCustomAlertValues();
                     uiHandler.post(() -> {
                         if (v != null) setBatteryVoltage(v);
@@ -315,6 +403,46 @@ public class MainActivity extends AppCompatActivity {
             }
         }
     };
+
+    private void startSpeeduinoPolling() {
+        if (speeduinoPolling) return;
+        speeduinoPolling = true;
+
+        speeduinoPollThread = new HandlerThread("SpeeduinoPoll");
+        speeduinoPollThread.start();
+        speeduinoPollHandler = new Handler(speeduinoPollThread.getLooper());
+        speeduinoPollHandler.post(speeduinoPollRunnable);
+    }
+
+    /** Independente do pollRunnable do ELM327 — porta USB própria, sem
+     * disputa. Roda sempre (não só na tela do dashboard), pra alimentar o
+     * MslLogger continuamente mesmo com o gráfico de lambda em primeiro
+     * plano; atualizar a UI do dashboard quando ele não estiver visível não
+     * tem custo perceptível (a View simplesmente não desenha enquanto GONE). */
+    private final Runnable speeduinoPollRunnable = new Runnable() {
+        @Override
+        public void run() {
+            if (!speeduinoPolling || !speeduino.isConnected()) return;
+
+            final SpeeduinoManager.SpeeduinoData data = speeduino.readOutputChannels();
+            mslLogger.updateSpeeduino(data);
+            uiHandler.post(() -> dashboardView.updateSpeeduinoData(data));
+
+            if (speeduinoPolling) {
+                speeduinoPollHandler.postDelayed(this, POLL_INTERVAL_MS);
+            }
+        }
+    };
+
+    private void stopSpeeduinoPolling() {
+        speeduinoPolling = false;
+        if (speeduinoPollThread != null) {
+            speeduinoPollThread.quitSafely();
+            speeduinoPollThread = null;
+        }
+        speeduino.disconnect();
+        dashboardView.clearSpeeduinoData();
+    }
 
     /** Lê o valor atual de cada alerta personalizado configurado. Chamado só
      * do thread de polling (nunca da UI thread) — mesma serialização de todo
@@ -363,6 +491,11 @@ public class MainActivity extends AppCompatActivity {
         }
         elm327.disconnect();
         stopCsvLog();
+        stopSpeeduinoPolling();
+        if (mslLogger.isRecording()) {
+            mslLogger.stop();
+            updateMslLogButtonUi();
+        }
         // Parar foreground service
         stopService(new Intent(this, OBD2ForegroundService.class));
     }
@@ -370,6 +503,7 @@ public class MainActivity extends AppCompatActivity {
     private void updateUI(Elm327Manager.LambdaData data) {
         // Chart - só lambda, sem RPM/timing para máxima velocidade
         chartView.addData(data.o2s1Lambda, data.o2s5Lambda, data.o2s1Current, data.o2s5Current);
+        mslLogger.updateObd2Lambda(data.o2s1Lambda, data.o2s5Lambda);
 
         // CSV Log
         writeCsvLine(data);
@@ -428,6 +562,8 @@ public class MainActivity extends AppCompatActivity {
         etTempMax.setText(trimZero(alertManager.getTempMax()));
         etTempHysteresis.setText(trimZero(alertManager.getTempHysteresis()));
         renderCustomRulesList();
+        renderUsbDevicesList();
+        updateMslLogButtonUi();
         layoutDash.setVisibility(View.GONE);
         layoutAlertSettings.setVisibility(View.VISIBLE);
     }
@@ -502,6 +638,100 @@ public class MainActivity extends AppCompatActivity {
             row.addView(remove);
 
             layoutCustomRules.addView(row);
+        }
+    }
+
+    /** Lista os adaptadores USB-serial plugados agora, cada um com um
+     * seletor de papel (Nenhum/ELM327/Speeduino) — não dá pra distinguir
+     * automaticamente por VID/PID, então o usuário escolhe uma vez e a
+     * escolha fica salva (DeviceRoleManager). */
+    private void renderUsbDevicesList() {
+        layoutUsbDevices.removeAllViews();
+        List<UsbSerialDriver> drivers = UsbSerialProber.getDefaultProber().findAllDrivers(usbManager);
+        float density = getResources().getDisplayMetrics().density;
+
+        if (drivers.isEmpty()) {
+            TextView empty = new TextView(this);
+            empty.setText("Nenhum adaptador USB detectado agora.");
+            empty.setTextColor(Color.parseColor("#666666"));
+            empty.setTextSize(13f);
+            layoutUsbDevices.addView(empty);
+            return;
+        }
+
+        String[] roles = {DeviceRoleManager.ROLE_NONE, DeviceRoleManager.ROLE_ELM327, DeviceRoleManager.ROLE_SPEEDUINO};
+        String[] roleLabels = {"Nenhum", "ELM327", "Speeduino"};
+        ArrayAdapter<String> roleAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, roleLabels);
+        roleAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+
+        for (UsbSerialDriver driver : drivers) {
+            String key = deviceRoleManager.keyFor(usbManager, driver, drivers);
+            String currentRole = deviceRoleManager.getRole(key);
+
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setPadding(0, (int) (4 * density), 0, (int) (4 * density));
+
+            TextView label = new TextView(this);
+            label.setText(deviceRoleManager.labelFor(usbManager, driver));
+            label.setTextColor(Color.parseColor("#EEEEEE"));
+            label.setTextSize(13f);
+            LinearLayout.LayoutParams labelLp = new LinearLayout.LayoutParams(
+                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+            row.addView(label, labelLp);
+
+            Spinner roleSpinner = new Spinner(this);
+            roleSpinner.setAdapter(roleAdapter);
+            int selection = 0;
+            for (int i = 0; i < roles.length; i++) {
+                if (roles[i].equals(currentRole)) { selection = i; break; }
+            }
+            roleSpinner.setSelection(selection, false);
+            roleSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+                @Override
+                public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                    deviceRoleManager.setRole(key, roles[position]);
+                }
+
+                @Override
+                public void onNothingSelected(AdapterView<?> parent) {}
+            });
+            row.addView(roleSpinner);
+
+            layoutUsbDevices.addView(row);
+        }
+    }
+
+    // ---- Log combinado .msl ----
+
+    private void toggleMslLog() {
+        if (mslLogger.isRecording()) {
+            mslLogger.stop();
+            updateMslLogButtonUi();
+            return;
+        }
+        try {
+            String filename = mslLogger.start();
+            Toast.makeText(this, "Gravando: " + filename, Toast.LENGTH_SHORT).show();
+        } catch (IOException e) {
+            Toast.makeText(this, "Erro ao iniciar log: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+        }
+        updateMslLogButtonUi();
+    }
+
+    /** Atualiza o botão/status enquanto a tela de Configurações estiver
+     * aberta — sem tique automático: o texto reflete o estado só quando a
+     * tela é (re)aberta ou o botão é tocado, suficiente pro caso de uso
+     * (gravação é um "liga/desliga" ocasional, não precisa de cronômetro
+     * ao vivo). */
+    private void updateMslLogButtonUi() {
+        if (mslLogger.isRecording()) {
+            btnMslLog.setText("Parar gravação");
+            tvMslLogStatus.setText("Gravando…");
+        } else {
+            btnMslLog.setText("Gravar log");
+            tvMslLogStatus.setText("");
         }
     }
 
@@ -627,6 +857,7 @@ public class MainActivity extends AppCompatActivity {
         btnConnect.setText("CONECTAR");
         chartView.clearData();
         dashboardView.clearData();
+        dashboardView.clearSpeeduinoData();
         updateAlertBanners(Collections.emptyList());
         // Reset para tela de lambda como padrão
         showingDashboard = false;
