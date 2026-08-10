@@ -1,9 +1,9 @@
 -- Merging decision tree log ---
 manifest
-ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:2:1-39:12
-INJECTED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:2:1-39:12
-INJECTED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:2:1-39:12
-INJECTED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:2:1-39:12
+ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:2:1-41:12
+INJECTED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:2:1-41:12
+INJECTED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:2:1-41:12
+INJECTED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:2:1-41:12
 MERGED from [androidx.appcompat:appcompat-resources:1.6.1] /home/robca/.gradle/caches/8.10.2/transforms/eda811fbee4fa48fb11a2e276a557355/transformed/jetified-appcompat-resources-1.6.1/AndroidManifest.xml:17:1-22:12
 MERGED from [androidx.appcompat:appcompat:1.6.1] /home/robca/.gradle/caches/8.10.2/transforms/2cabc5eed3dd2e9bc3fe41840b7685d5/transformed/appcompat-1.6.1/AndroidManifest.xml:17:1-22:12
 MERGED from [com.github.mik3y:usb-serial-for-android:3.7.3] /home/robca/.gradle/caches/8.10.2/transforms/319c7470fd833b597ec30170c8952604/transformed/jetified-usb-serial-for-android-3.7.3/AndroidManifest.xml:2:1-7:12
@@ -51,9 +51,17 @@ uses-permission#android.permission.FOREGROUND_SERVICE
 ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:5:5-77
 	android:name
 		ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:5:22-74
+uses-permission#android.permission.ACCESS_FINE_LOCATION
+ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:6:5-79
+	android:name
+		ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:6:22-76
+uses-permission#android.permission.ACCESS_COARSE_LOCATION
+ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:7:5-81
+	android:name
+		ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:7:22-78
 application
-ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:7:5-37:19
-INJECTED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:7:5-37:19
+ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:9:5-39:19
+INJECTED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:9:5-39:19
 MERGED from [androidx.emoji2:emoji2:1.2.0] /home/robca/.gradle/caches/8.10.2/transforms/cbbd37dd9caa8e1da1ea6744dbdcfd04/transformed/jetified-emoji2-1.2.0/AndroidManifest.xml:23:5-33:19
 MERGED from [androidx.emoji2:emoji2:1.2.0] /home/robca/.gradle/caches/8.10.2/transforms/cbbd37dd9caa8e1da1ea6744dbdcfd04/transformed/jetified-emoji2-1.2.0/AndroidManifest.xml:23:5-33:19
 MERGED from [androidx.core:core:1.12.0] /home/robca/.gradle/caches/8.10.2/transforms/92d06ed5b14b2e93b263a2634017b904/transformed/core-1.12.0/AndroidManifest.xml:28:5-89
@@ -69,51 +77,51 @@ MERGED from [androidx.startup:startup-runtime:1.1.1] /home/robca/.gradle/caches/
 	android:appComponentFactory
 		ADDED from [androidx.core:core:1.12.0] /home/robca/.gradle/caches/8.10.2/transforms/92d06ed5b14b2e93b263a2634017b904/transformed/core-1.12.0/AndroidManifest.xml:28:18-86
 	android:supportsRtl
-		ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:11:9-35
+		ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:13:9-35
 	android:label
-		ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:9:9-39
+		ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:11:9-39
 	android:allowBackup
-		ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:8:9-35
+		ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:10:9-35
 	android:theme
-		ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:10:9-59
+		ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:12:9-59
 activity#com.obd2.lambda.MainActivity
-ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:13:9-32:20
+ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:15:9-34:20
 	android:screenOrientation
-		ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:16:13-49
+		ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:18:13-49
 	android:exported
-		ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:15:13-36
+		ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:17:13-36
 	android:configChanges
-		ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:17:13-59
+		ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:19:13-59
 	android:name
-		ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:14:13-41
+		ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:16:13-41
 intent-filter#action:name:android.intent.action.MAIN+category:name:android.intent.category.LAUNCHER
-ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:19:13-22:29
+ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:21:13-24:29
 action#android.intent.action.MAIN
-ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:20:17-69
+ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:22:17-69
 	android:name
-		ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:20:25-66
+		ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:22:25-66
 category#android.intent.category.LAUNCHER
-ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:21:17-77
+ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:23:17-77
 	android:name
-		ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:21:27-74
+		ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:23:27-74
 intent-filter#action:name:android.hardware.usb.action.USB_DEVICE_ATTACHED
-ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:25:13-27:29
+ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:27:13-29:29
 action#android.hardware.usb.action.USB_DEVICE_ATTACHED
-ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:26:17-90
+ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:28:17-90
 	android:name
-		ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:26:25-87
+		ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:28:25-87
 meta-data#android.hardware.usb.action.USB_DEVICE_ATTACHED
-ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:29:13-31:57
+ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:31:13-33:57
 	android:resource
-		ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:31:17-54
+		ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:33:17-54
 	android:name
-		ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:30:17-79
+		ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:32:17-79
 service#com.obd2.lambda.OBD2ForegroundService
-ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:34:9-36:40
+ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:36:9-38:40
 	android:exported
-		ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:36:13-37
+		ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:38:13-37
 	android:name
-		ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:35:13-50
+		ADDED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml:37:13-50
 uses-sdk
 INJECTED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml reason: use-sdk injection requested
 INJECTED from /home/robca/obd2/lambda_android/app/src/main/AndroidManifest.xml

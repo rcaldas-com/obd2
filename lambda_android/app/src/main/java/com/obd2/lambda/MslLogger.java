@@ -7,8 +7,9 @@ import android.util.Log;
 
 import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileWriter;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStreamWriter;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
@@ -36,6 +37,10 @@ public class MslLogger {
 
     private static final String TAG = "MSL_LOGGER";
     private static final long TICK_MS = 100; // 10Hz
+    // A cada quantas linhas força os dados até o armazenamento físico
+    // (fsync) — não a cada linha, tem custo real; a cada ~1s já limita bem
+    // a perda num desligamento abrupto sem gastar demais.
+    private static final int SYNC_EVERY_N_ROWS = 10;
 
     private static final String[] COLUMN_NAMES = {
             "Time", "RPM", "MAP", "TPS", "CLT", "IAT", "Advance _Current",
@@ -51,8 +56,10 @@ public class MslLogger {
     private final Context context;
     private HandlerThread thread;
     private Handler handler;
+    private FileOutputStream fileOutputStream;
     private BufferedWriter writer;
     private long startTimeMillis;
+    private int rowsSinceSync = 0;
     private volatile boolean recording = false;
 
     // Última leitura conhecida de cada fonte — ver comentário da classe.
@@ -105,7 +112,8 @@ public class MslLogger {
 
         String filename = new SimpleDateFormat("yyyy-MM-dd_HH.mm.ss", Locale.US).format(new Date()) + ".msl";
         File file = new File(dir, filename);
-        writer = new BufferedWriter(new FileWriter(file));
+        fileOutputStream = new FileOutputStream(file);
+        writer = new BufferedWriter(new OutputStreamWriter(fileOutputStream));
 
         writer.write("speeduino 202501: Speeduino 2025.01.7\n");
         writer.write("Capture Date: " + new Date() + ", File author: lambda_android\n");
@@ -113,8 +121,10 @@ public class MslLogger {
         writer.write(joinTab(COLUMN_NAMES) + "\n");
         writer.write(joinTab(COLUMN_UNITS) + "\n");
         writer.flush();
+        syncQuietly();
 
         startTimeMillis = System.currentTimeMillis();
+        rowsSinceSync = 0;
         recording = true;
 
         thread = new HandlerThread("MslLogger");
@@ -134,18 +144,29 @@ public class MslLogger {
         }
         if (writer != null) {
             try {
+                writer.flush();
+                syncQuietly();
                 writer.close();
             } catch (IOException e) {
                 Log.w(TAG, "Erro ao fechar log .msl: " + e.getMessage());
             }
             writer = null;
+            fileOutputStream = null;
         }
     }
 
-    /** Segundos decorridos desde o início da gravação — pra UI mostrar
-     * "Gravando (00:34)". */
-    public long elapsedSeconds() {
-        return recording ? (System.currentTimeMillis() - startTimeMillis) / 1000 : 0;
+    /** Força os dados até o armazenamento físico — writer.flush() só tira o
+     * dado do buffer do Java, não garante que o SO já gravou no flash.
+     * Best-effort: alguns sistemas de arquivo/dispositivos não suportam
+     * sync (SyncFailedException) — nesse caso não há mais nada a fazer por
+     * software, só seguir. */
+    private void syncQuietly() {
+        if (fileOutputStream == null) return;
+        try {
+            fileOutputStream.getFD().sync();
+        } catch (IOException e) {
+            Log.w(TAG, "Sync do log .msl falhou (ignorado): " + e.getMessage());
+        }
     }
 
     // String.join só existe a partir da API 26 — este app roda em Android 5.0
@@ -191,6 +212,10 @@ public class MslLogger {
             writer.write(line);
             writer.write("\n");
             writer.flush();
+            if (++rowsSinceSync >= SYNC_EVERY_N_ROWS) {
+                rowsSinceSync = 0;
+                syncQuietly();
+            }
         } catch (IOException e) {
             Log.w(TAG, "Erro ao escrever linha do log .msl: " + e.getMessage());
         }

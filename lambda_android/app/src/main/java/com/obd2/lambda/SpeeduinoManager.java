@@ -81,6 +81,13 @@ public class SpeeduinoManager {
     public String connect(UsbManager usbManager, UsbSerialDriver driver) throws IOException {
         String deviceName = session.open(usbManager, driver, BAUD_RATE);
         connected = true;
+
+        // A Speeduino roda em Mega2560, que tem o circuito clássico de
+        // auto-reset via DTR (mesmo comportamento do TunerStudio ao
+        // conectar — esperado). Espera o firmware terminar de subir antes
+        // do primeiro handshake.
+        sleep(2000);
+
         return deviceName;
     }
 
@@ -91,6 +98,21 @@ public class SpeeduinoManager {
 
     public boolean isConnected() {
         return connected && session.isOpen();
+    }
+
+    private void sleep(long ms) {
+        try { Thread.sleep(ms); } catch (InterruptedException ignored) {}
+    }
+
+    /** Descarta qualquer byte parado no buffer de recepção — ver
+     * comentário em sendCommand() sobre por que isso importa aqui
+     * (nenhum marcador de resync no protocolo, ao contrário do ELM327
+     * que sempre termina com '>'). */
+    private void drainBuffer() {
+        byte[] buf = new byte[MAX_RESPONSE_SIZE];
+        try {
+            while (session.read(buf, 15) > 0) { /* drain */ }
+        } catch (IOException ignored) {}
     }
 
     /** Handshake de conectividade: manda 'Q' e confere a assinatura
@@ -176,25 +198,64 @@ public class SpeeduinoManager {
         return u8(block, offset) | (u8(block, offset + 1) << 8);
     }
 
+    // Folga generosa pro maior pacote possível (tamanho[2] + SERIAL_RC_OK(1)
+    // + bloco(130) + CRC[4]) — usado como teto de segurança pro acumulador.
+    private static final int MAX_RESPONSE_SIZE = 2 + 1 + OCH_BLOCK_SIZE + 4 + 8;
+
     /** Monta o envelope (tamanho + payload + CRC32), envia, lê o envelope de
      * resposta e devolve só o payload da resposta (sem tamanho nem CRC).
-     * Retorna null se o CRC da resposta não bater. */
+     * Retorna null se o CRC da resposta não bater.
+     *
+     * Lê tudo num único buffer acumulador, sem descartar bytes — CDC-ACM
+     * (USB nativo, como esta Speeduino) costuma entregar a resposta inteira
+     * de uma vez num pacote só, então uma leitura pode trazer bem mais do
+     * que o pedaço "atual" (ex.: os 2 bytes de tamanho + o payload inteiro +
+     * o CRC, tudo junto). Ler cada pedaço num buffer descartável separado
+     * (implementação anterior) jogava fora esse excedente e travava
+     * esperando dados que o dispositivo já tinha mandado.
+     *
+     * Antes de mandar, drena qualquer byte perdido de uma troca anterior
+     * incompleta (ex.: um timeout no meio de uma resposta, plausível no
+     * ambiente eletricamente ruidoso de um carro com bobinas de ignição
+     * disparando perto da placa) — sem isso, a sobra fica no buffer de
+     * recepção e é lida como se fosse o início da PRÓXIMA resposta,
+     * corrompendo tudo dali em diante até religar a porta (e às vezes nem
+     * isso resolve, se o firmware do outro lado também ficou confuso). */
     private byte[] sendCommand(byte[] payload) throws IOException {
+        drainBuffer();
         session.write(wrapRequest(payload), WRITE_TIMEOUT_MS);
 
         long deadline = System.currentTimeMillis() + READ_TIMEOUT_MS;
-        byte[] lengthBytes = readExactly(2, deadline);
-        if (lengthBytes == null) return null;
-        int responseLength = ((lengthBytes[0] & 0xFF) << 8) | (lengthBytes[1] & 0xFF);
+        byte[] acc = new byte[MAX_RESPONSE_SIZE];
+        byte[] chunk = new byte[MAX_RESPONSE_SIZE];
+        int have = 0;
+        int totalLength = -1;
 
-        byte[] responsePayload = readExactly(responseLength, deadline);
-        if (responsePayload == null) return null;
+        while (totalLength < 0 || have < totalLength) {
+            if (System.currentTimeMillis() > deadline) return null;
+            int len = session.read(chunk, 100);
+            if (len <= 0) continue;
+            if (have + len > acc.length) len = acc.length - have; // não deve acontecer, só por segurança
+            System.arraycopy(chunk, 0, acc, have, len);
+            have += len;
+            if (totalLength < 0 && have >= 2) {
+                int responseLength = ((acc[0] & 0xFF) << 8) | (acc[1] & 0xFF);
+                totalLength = 2 + responseLength + 4;
+                if (totalLength > acc.length) {
+                    Log.w(TAG, "Resposta maior que o esperado (" + totalLength + " bytes) — ignorando");
+                    return null;
+                }
+            }
+        }
 
-        byte[] crcBytes = readExactly(4, deadline);
-        if (crcBytes == null) return null;
+        int responseLength = totalLength - 6;
+        byte[] responsePayload = new byte[responseLength];
+        System.arraycopy(acc, 2, responsePayload, 0, responseLength);
 
-        long expectedCrc = ((long) (crcBytes[0] & 0xFF) << 24) | ((crcBytes[1] & 0xFF) << 16)
-                | ((crcBytes[2] & 0xFF) << 8) | (crcBytes[3] & 0xFF);
+        long expectedCrc = ((long) (acc[2 + responseLength] & 0xFF) << 24)
+                | ((acc[2 + responseLength + 1] & 0xFF) << 16)
+                | ((acc[2 + responseLength + 2] & 0xFF) << 8)
+                | (acc[2 + responseLength + 3] & 0xFF);
         CRC32 crc = new CRC32();
         crc.update(responsePayload);
         if (crc.getValue() != expectedCrc) {
@@ -219,23 +280,5 @@ public class SpeeduinoManager {
         out[base + 2] = (byte) ((crcValue >> 8) & 0xFF);
         out[base + 3] = (byte) (crcValue & 0xFF);
         return out;
-    }
-
-    /** Acumula bytes até ter exatamente `count`, ou desiste no deadline. */
-    private byte[] readExactly(int count, long deadlineMillis) throws IOException {
-        if (count == 0) return new byte[0];
-        byte[] result = new byte[count];
-        int have = 0;
-        byte[] chunk = new byte[Math.max(count, 32)];
-        while (have < count) {
-            if (System.currentTimeMillis() > deadlineMillis) return null;
-            int len = session.read(chunk, 100);
-            if (len > 0) {
-                int toCopy = Math.min(len, count - have);
-                System.arraycopy(chunk, 0, result, have, toCopy);
-                have += toCopy;
-            }
-        }
-        return result;
     }
 }

@@ -17,19 +17,21 @@ import java.util.Locale;
  */
 public class DashboardView extends View {
 
-    // Dados atuais — RPM/água/ar/velocidade/TPS vêm do OBD2; ponto/MAP/baro/
-    // flex vêm da Speeduino (quem realmente comanda a ignição agora), lidos
-    // por um loop de poll independente — ver updateSpeeduinoData().
+    // Dados atuais — RPM/água/ar/velocidade vêm do OBD2 (velocidade pode vir
+    // do GPS do dispositivo, sobrescrita em MainActivity); ponto/MAP/baro/
+    // flex/TPS vêm da Speeduino (quem realmente comanda a ignição agora e
+    // cujo TPS é o que os mapas dela usam), lidos por um loop de poll
+    // independente — ver updateSpeeduinoData().
     private Integer rpm;
     private Float coolantTemp;
     private Float intakeAirTemp;
     private Integer speed;
-    private Float tps;
     private Float batteryVoltage;
     private Float speeduinoAdvance;
     private Float speeduinoMap;
     private Float speeduinoBaro;
     private Integer speeduinoFlexPct;
+    private Float speeduinoTps;
 
     // Paints
     private final Paint paintBg = new Paint();
@@ -104,7 +106,6 @@ public class DashboardView extends View {
         this.coolantTemp = data.coolantTemp;
         this.intakeAirTemp = data.intakeAirTemp;
         this.speed = data.speed;
-        this.tps = data.tps;
         this.batteryVoltage = data.batteryVoltage;
         postInvalidate();
     }
@@ -118,6 +119,7 @@ public class DashboardView extends View {
         this.speeduinoMap = data.mapKpa;
         this.speeduinoBaro = data.baroKpa;
         this.speeduinoFlexPct = data.ethanolPct;
+        this.speeduinoTps = data.tpsPct;
         postInvalidate();
     }
 
@@ -126,18 +128,18 @@ public class DashboardView extends View {
         coolantTemp = null;
         intakeAirTemp = null;
         speed = null;
-        tps = null;
         batteryVoltage = null;
         postInvalidate();
     }
 
-    /** Chamado quando a Speeduino desconecta — os 4 gauges dela voltam a
+    /** Chamado quando a Speeduino desconecta — os gauges dela voltam a
      * mostrar "--", os outros (OBD2) continuam como estavam. */
     public void clearSpeeduinoData() {
         speeduinoAdvance = null;
         speeduinoMap = null;
         speeduinoBaro = null;
         speeduinoFlexPct = null;
+        speeduinoTps = null;
         postInvalidate();
     }
 
@@ -192,9 +194,9 @@ public class DashboardView extends View {
 
         drawGauge(canvas, col2, row1,
                 cellW, cellH, "TPS",
-                tps != null ? String.format(Locale.US, "%.1f", tps) : "--", "%",
-                tps != null ? tps / 100f : 0f,
-                getTpsColor(tps));
+                speeduinoTps != null ? String.format(Locale.US, "%.1f", speeduinoTps) : "--", "%",
+                speeduinoTps != null ? speeduinoTps / 100f : 0f,
+                getTpsColor(speeduinoTps));
 
         // Linha 3: MAP | BARO | FLEX (todos da Speeduino)
         drawGauge(canvas, col0, row2,

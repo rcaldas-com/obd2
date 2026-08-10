@@ -1,10 +1,12 @@
 package com.obd2.lambda;
 
+import android.Manifest;
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.hardware.usb.UsbManager;
@@ -26,18 +28,14 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
 
 import com.hoho.android.usbserial.driver.UsbSerialDriver;
 import com.hoho.android.usbserial.driver.UsbSerialProber;
 
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -53,9 +51,10 @@ public class MainActivity extends AppCompatActivity {
     // ser rápidas pro ajuste em tempo real). Também é a cadência dos alertas
     // nessa tela — pedido explicitamente em baixa frequência.
     private static final int ALERT_CHECK_INTERVAL_MS = 3000;
+    private static final int REQUEST_LOCATION_PERMISSION = 1001;
 
     // UI Elements
-    private TextView tvConnStatus, tvBatteryVoltage;
+    private TextView tvConnStatus, tvBatteryVoltage, tvRecIndicator;
     private Button btnConnect, btnToggleScreen;
     private LambdaChartView chartView;
     private DashboardView dashboardView;
@@ -88,6 +87,7 @@ public class MainActivity extends AppCompatActivity {
     private SpeeduinoManager speeduino;
     private DeviceRoleManager deviceRoleManager;
     private MslLogger mslLogger;
+    private GpsSpeedProvider gpsSpeedProvider;
     private UsbManager usbManager;
     private HandlerThread pollThread;
     private Handler pollHandler;
@@ -98,10 +98,6 @@ public class MainActivity extends AppCompatActivity {
     private boolean polling = false;
     private long lastAlertCheckTime = 0;
     private AlertManager alertManager;
-
-    // CSV Logging
-    private BufferedWriter csvWriter;
-    private boolean logging = false;
 
     private final BroadcastReceiver usbPermissionReceiver = new BroadcastReceiver() {
         @Override
@@ -129,6 +125,19 @@ public class MainActivity extends AppCompatActivity {
         }
     };
 
+    // A multimídia parece suspender antes de desligar de vez (não é sempre
+    // um corte abrupto de energia) — esse broadcast padrão do Android avisa
+    // antes do desligamento, dando a chance de fechar o log .msl direito
+    // (stopPolling() já cuida disso) em vez de confiar só em onDestroy(),
+    // que não é garantido disparar a tempo num desligamento do sistema.
+    private final BroadcastReceiver shutdownReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            Log.i(TAG, "Desligamento do sistema detectado — parando gravação/polling");
+            stopPolling();
+        }
+    };
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -145,11 +154,28 @@ public class MainActivity extends AppCompatActivity {
         alertManager = new AlertManager(this);
         uiHandler = new Handler(getMainLooper());
 
+        gpsSpeedProvider = new GpsSpeedProvider(this);
+        if (gpsSpeedProvider.hasPermission()) {
+            gpsSpeedProvider.start();
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, REQUEST_LOCATION_PERMISSION);
+        }
+
         initViews();
         registerReceivers();
 
         // Verificar se já há um dispositivo USB conectado
         checkExistingUsb();
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == REQUEST_LOCATION_PERMISSION && grantResults.length > 0
+                && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            gpsSpeedProvider.start();
+        }
     }
 
     private void initViews() {
@@ -159,6 +185,7 @@ public class MainActivity extends AppCompatActivity {
         tvConnStatus = findViewById(R.id.tv_conn_status);
 
         tvBatteryVoltage = findViewById(R.id.tv_battery_voltage);
+        tvRecIndicator = findViewById(R.id.tv_rec_indicator);
 
         chartView = findViewById(R.id.chart_view);
         dashboardView = findViewById(R.id.dashboard_view);
@@ -222,6 +249,9 @@ public class MainActivity extends AppCompatActivity {
 
         IntentFilter detachFilter = new IntentFilter(UsbManager.ACTION_USB_DEVICE_DETACHED);
         registerReceiver(usbDetachReceiver, detachFilter);
+
+        IntentFilter shutdownFilter = new IntentFilter(Intent.ACTION_SHUTDOWN);
+        registerReceiver(shutdownReceiver, shutdownFilter);
     }
 
     private void checkExistingUsb() {
@@ -242,7 +272,7 @@ public class MainActivity extends AppCompatActivity {
 
         boolean anyRoleAssigned = false;
         for (UsbSerialDriver driver : drivers) {
-            String key = deviceRoleManager.keyFor(usbManager, driver, drivers);
+            String key = deviceRoleManager.keyFor(driver, drivers);
             if (!DeviceRoleManager.ROLE_NONE.equals(deviceRoleManager.getRole(key))) {
                 anyRoleAssigned = true;
                 break;
@@ -254,7 +284,7 @@ public class MainActivity extends AppCompatActivity {
         // existir a atribuição de papéis. Só exige escolha manual quando há
         // 2+ adaptadores (aí sim é ambíguo qual é qual).
         if (!anyRoleAssigned && drivers.size() == 1) {
-            String key = deviceRoleManager.keyFor(usbManager, drivers.get(0), drivers);
+            String key = deviceRoleManager.keyFor(drivers.get(0), drivers);
             deviceRoleManager.setRole(key, DeviceRoleManager.ROLE_ELM327);
             anyRoleAssigned = true;
         }
@@ -268,7 +298,7 @@ public class MainActivity extends AppCompatActivity {
         // requestConnection() de novo, que segue pro próximo sem permissão
         // até todos estarem prontos, e então cai em doConnect().
         for (UsbSerialDriver driver : drivers) {
-            String key = deviceRoleManager.keyFor(usbManager, driver, drivers);
+            String key = deviceRoleManager.keyFor(driver, drivers);
             if (DeviceRoleManager.ROLE_NONE.equals(deviceRoleManager.getRole(key))) continue;
             if (!usbManager.hasPermission(driver.getDevice())) {
                 btnConnect.setEnabled(false);
@@ -294,7 +324,7 @@ public class MainActivity extends AppCompatActivity {
         UsbSerialDriver elmDriver = null;
         UsbSerialDriver speeduinoDriver = null;
         for (UsbSerialDriver driver : drivers) {
-            String key = deviceRoleManager.keyFor(usbManager, driver, drivers);
+            String key = deviceRoleManager.keyFor(driver, drivers);
             String role = deviceRoleManager.getRole(key);
             if (DeviceRoleManager.ROLE_ELM327.equals(role)) elmDriver = driver;
             else if (DeviceRoleManager.ROLE_SPEEDUINO.equals(role)) speeduinoDriver = driver;
@@ -318,32 +348,39 @@ public class MainActivity extends AppCompatActivity {
                     Log.w(TAG, "Falha ao conectar ELM327: " + e.getMessage());
                 }
             }
+            String speeduinoFailReason = null;
             if (finalSpeeduinoDriver != null) {
                 try {
                     speeduino.connect(usbManager, finalSpeeduinoDriver);
                     if (!speeduino.verifySignature()) {
+                        speeduinoFailReason = "não respondeu ao handshake";
                         Log.w(TAG, "Speeduino conectada mas assinatura não confere — desconectando");
                         speeduino.disconnect();
                     }
                 } catch (IOException e) {
+                    speeduinoFailReason = e.getMessage();
                     Log.w(TAG, "Falha ao conectar Speeduino: " + e.getMessage());
                 }
             }
 
             final String finalElmDeviceName = elmDeviceName;
+            final String finalSpeeduinoFailReason = speeduinoFailReason;
             uiHandler.post(() -> {
                 if (elm327.isConnected() || speeduino.isConnected()) {
                     showDashView();
                     StringBuilder status = new StringBuilder();
                     if (elm327.isConnected()) status.append("Conectado: ").append(finalElmDeviceName);
                     else if (finalElmDriver != null) status.append("Falha no ELM327");
-                    if (speeduino.isConnected()) status.append(status.length() > 0 ? " · Speeduino OK" : "Speeduino OK");
-                    else if (finalSpeeduinoDriver != null) status.append(status.length() > 0 ? " · falha na Speeduino" : "Falha na Speeduino");
+                    if (speeduino.isConnected()) {
+                        status.append(status.length() > 0 ? " · Speeduino OK" : "Speeduino OK");
+                    } else if (finalSpeeduinoDriver != null) {
+                        String detail = "Falha na Speeduino" + (finalSpeeduinoFailReason != null ? " (" + finalSpeeduinoFailReason + ")" : "");
+                        status.append(status.length() > 0 ? " · " + detail : detail);
+                    }
                     showStatus(status.toString());
 
                     if (elm327.isConnected()) {
                         startPolling();
-                        startCsvLog();
                     }
                     if (speeduino.isConnected()) {
                         startSpeeduinoPolling();
@@ -502,7 +539,6 @@ public class MainActivity extends AppCompatActivity {
             pollThread = null;
         }
         elm327.disconnect();
-        stopCsvLog();
         stopSpeeduinoPolling();
         if (mslLogger.isRecording()) {
             mslLogger.stop();
@@ -516,15 +552,20 @@ public class MainActivity extends AppCompatActivity {
         // Chart - só lambda, sem RPM/timing para máxima velocidade
         chartView.addData(data.o2s1Lambda, data.o2s5Lambda, data.o2s1Current, data.o2s5Current);
         mslLogger.updateObd2Lambda(data.o2s1Lambda, data.o2s5Lambda);
-
-        // CSV Log
-        writeCsvLine(data);
     }
 
     private void updateDashboardUI(Elm327Manager.DashboardData data) {
         // Voltagem da bateria na barra inferior
         if (data.batteryVoltage != null) {
             setBatteryVoltage(data.batteryVoltage);
+        }
+
+        // GPS do próprio dispositivo quando disponível — o OBD2 às vezes dá
+        // velocidade errada nessa instalação; cai pro OBD2 só se não tiver
+        // fix de GPS recente.
+        Float gpsSpeedKmh = gpsSpeedProvider.getSpeedKmh();
+        if (gpsSpeedKmh != null) {
+            data.speed = Math.round(gpsSpeedKmh);
         }
 
         dashboardView.updateData(data);
@@ -687,7 +728,7 @@ public class MainActivity extends AppCompatActivity {
         roleAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
 
         for (UsbSerialDriver driver : drivers) {
-            String key = deviceRoleManager.keyFor(usbManager, driver, drivers);
+            String key = deviceRoleManager.keyFor(driver, drivers);
             String currentRole = deviceRoleManager.getRole(key);
 
             LinearLayout row = new LinearLayout(this);
@@ -748,13 +789,17 @@ public class MainActivity extends AppCompatActivity {
      * (gravação é um "liga/desliga" ocasional, não precisa de cronômetro
      * ao vivo). */
     private void updateMslLogButtonUi() {
-        if (mslLogger.isRecording()) {
+        boolean recording = mslLogger.isRecording();
+        if (recording) {
             btnMslLog.setText("Parar gravação");
             tvMslLogStatus.setText("Gravando…");
         } else {
             btnMslLog.setText("Gravar log");
             tvMslLogStatus.setText("");
         }
+        // Visível em cima do dashboard/gráfico também, não só aqui dentro
+        // de Configurações — pra não esquecer que está gravando.
+        tvRecIndicator.setVisibility(recording ? View.VISIBLE : View.GONE);
     }
 
     // ---- Adicionar alerta personalizado (escolha de PID) ----
@@ -923,63 +968,13 @@ public class MainActivity extends AppCompatActivity {
         Log.i(TAG, msg);
     }
 
-    // ---- CSV Logging ----
-
-    private void startCsvLog() {
-        try {
-            File dir = new File(getExternalFilesDir(null), "logs");
-            if (!dir.exists()) dir.mkdirs();
-
-            String filename = "lambda_" + new SimpleDateFormat("yyyy-MM-dd_HH-mm", Locale.US)
-                    .format(new Date()) + ".csv";
-            File file = new File(dir, filename);
-
-            csvWriter = new BufferedWriter(new FileWriter(file));
-            csvWriter.write("timestamp,o2s1_current,o2s1_lambda,o2s5_current,o2s5_lambda,stft1,stft2,rpm,timing\n");
-            logging = true;
-
-            Log.i(TAG, "Logging para: " + file.getAbsolutePath());
-            Toast.makeText(this, "Log: " + filename, Toast.LENGTH_SHORT).show();
-        } catch (IOException e) {
-            Log.e(TAG, "Erro ao criar log CSV", e);
-        }
-    }
-
-    private void writeCsvLine(Elm327Manager.LambdaData data) {
-        if (!logging || csvWriter == null) return;
-        try {
-            csvWriter.write(String.format(Locale.US, "%d,%s,%s,%s,%s,%s,%s,%s,%s\n",
-                    data.timestamp,
-                    data.o2s1Current != null ? String.format("%.4f", data.o2s1Current) : "",
-                    data.o2s1Lambda != null ? String.format("%.4f", data.o2s1Lambda) : "",
-                    data.o2s5Current != null ? String.format("%.4f", data.o2s5Current) : "",
-                    data.o2s5Lambda != null ? String.format("%.4f", data.o2s5Lambda) : "",
-                    data.stft1 != null ? String.format("%.1f", data.stft1) : "",
-                    data.stft2 != null ? String.format("%.1f", data.stft2) : "",
-                    data.rpm != null ? data.rpm.toString() : "",
-                    data.timingAdvance != null ? String.format("%.1f", data.timingAdvance) : ""
-            ));
-            csvWriter.flush();
-        } catch (IOException e) {
-            Log.e(TAG, "Erro ao escrever CSV", e);
-        }
-    }
-
-    private void stopCsvLog() {
-        logging = false;
-        if (csvWriter != null) {
-            try {
-                csvWriter.close();
-            } catch (IOException ignored) {}
-            csvWriter = null;
-        }
-    }
-
     @Override
     protected void onDestroy() {
         stopPolling();
+        gpsSpeedProvider.stop();
         try { unregisterReceiver(usbPermissionReceiver); } catch (Exception ignored) {}
         try { unregisterReceiver(usbDetachReceiver); } catch (Exception ignored) {}
+        try { unregisterReceiver(shutdownReceiver); } catch (Exception ignored) {}
         super.onDestroy();
     }
 }

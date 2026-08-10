@@ -16,12 +16,18 @@ import java.util.List;
  * várias portas fixas, então o usuário escolhe uma vez na tela de
  * Configurações e a escolha fica salva.
  *
- * Chave de identidade: vendorId:productId:serialNumber. Quando o adaptador
- * não expõe serial (comum em clones CH340) ou tem permissão ainda não
- * concedida (getSerialNumber() exige isso a partir do Android 10), cai no
- * fallback vendorId:productId:posição — que quebra se dois adaptadores
- * idênticos forem trocados de porta entre uma sessão e outra; a tela avisa
- * isso explicitamente.
+ * Chave de identidade: vendorId:productId:posição (entre os dispositivos
+ * conectados agora com o mesmo vendor:product). Deliberadamente NÃO usa
+ * getSerialNumber(): ele só pode ser lido com permissão USB já concedida
+ * (a partir do Android 10), e essa permissão muda de estado entre o momento
+ * em que o usuário atribui o papel na tela de Configurações (ainda sem
+ * permissão) e o momento em que o app conecta de fato (permissão já
+ * concedida) — usar o serial só quando disponível faria a MESMA chave virar
+ * duas diferentes dependendo de QUANDO foi calculada, fazendo o papel
+ * "sumir" silenciosamente pra qualquer adaptador que realmente tenha um
+ * serial gravado (ex.: Arduino genuíno, ao contrário de clones CH340 sem
+ * serial). Só por posição quebra se dois adaptadores idênticos forem
+ * trocados de porta entre uma sessão e outra; a tela avisa isso.
  */
 public class DeviceRoleManager {
 
@@ -37,26 +43,14 @@ public class DeviceRoleManager {
         prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
     }
 
-    /** Chave estável (o quanto for possível) para um driver, na posição em
-     * que ele aparece na lista atual de drivers do mesmo vendor:product. */
-    public String keyFor(UsbManager usbManager, UsbSerialDriver driver, List<UsbSerialDriver> allDrivers) {
+    /** Chave estável (independente de permissão USB — ver comentário da
+     * classe), pela posição do driver entre os conectados agora com o
+     * mesmo vendor:product. */
+    public String keyFor(UsbSerialDriver driver, List<UsbSerialDriver> allDrivers) {
         UsbDevice device = driver.getDevice();
         int vendorId = device.getVendorId();
         int productId = device.getProductId();
 
-        String serial = null;
-        if (usbManager.hasPermission(device)) {
-            try {
-                serial = device.getSerialNumber();
-            } catch (SecurityException ignored) {
-                // Sem permissão mesmo tentando — segue pro fallback por posição.
-            }
-        }
-        if (serial != null && !serial.trim().isEmpty()) {
-            return vendorId + ":" + productId + ":" + serial;
-        }
-
-        // Fallback: posição entre os drivers com o mesmo vendor:product.
         int position = 0;
         for (UsbSerialDriver d : allDrivers) {
             UsbDevice dd = d.getDevice();

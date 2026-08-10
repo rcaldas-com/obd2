@@ -47,12 +47,12 @@ public class Elm327Manager {
         public Integer rpm;
         public Float coolantTemp;     // °C - PID 0105
         public Float intakeAirTemp;   // °C - PID 010F
-        public Integer speed;         // km/h - PID 010D
-        // Sem ponto de ignição aqui: quem comanda a ignição de verdade agora
-        // é a Speeduino, não a ECU original — ver SpeeduinoManager. O ponto
-        // original (PID 010E) ainda é lido, só que separado (readStockTimingAdvance),
-        // usado apenas como referência no log .msl (MslLogger), não no dashboard.
-        public Float tps;             // % - PID 0111 (absoluto)
+        public Integer speed;         // km/h - PID 010D (sobrescrito pelo GPS quando disponível, ver MainActivity)
+        // Sem ponto de ignição nem TPS aqui: quem comanda a ignição de
+        // verdade agora é a Speeduino, e o TPS dela é o que os mapas usam —
+        // ver SpeeduinoManager. O ponto original (PID 010E) ainda é lido,
+        // só que separado (readStockTimingAdvance), usado apenas como
+        // referência no log .msl (MslLogger), não no dashboard.
         public Float batteryVoltage;  // V - AT RV
         public long timestamp;
     }
@@ -172,7 +172,7 @@ public class Elm327Manager {
     }
 
     /**
-     * Lê dados do dashboard: RPM, temp água, temp ar, baro, ponto, TPS.
+     * Lê dados do dashboard: RPM, temp água, temp ar, velocidade, bateria.
      * Chamado apenas quando a tela de dashboard está ativa.
      */
     public DashboardData readDashboardData() {
@@ -224,20 +224,6 @@ public class Elm327Manager {
             }
         } catch (Exception e) {
             Log.w(TAG, "Erro PID 010D: " + e.getMessage());
-        }
-
-        // PID 0111 - Throttle Position (absoluto)
-        try {
-            String resp = queryPid("0111");
-            if (resp != null) {
-                String hex = resp.replaceAll("^.*4111", "").trim();
-                if (hex.length() >= 2) {
-                    int a = Integer.parseInt(hex.substring(0, 2), 16);
-                    data.tps = (a * 100f) / 255f;
-                }
-            }
-        } catch (Exception e) {
-            Log.w(TAG, "Erro PID 0111: " + e.getMessage());
         }
 
         // Voltagem da bateria (comando ELM327 local, leve)

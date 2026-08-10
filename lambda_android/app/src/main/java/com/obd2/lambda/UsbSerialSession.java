@@ -22,7 +22,12 @@ public class UsbSerialSession {
 
     /** Abre e configura a porta do driver já escolhido pelo chamador (a escolha
      * de qual dispositivo USB usar é responsabilidade de quem chama, via
-     * DeviceRoleManager — esta classe não enumera nem filtra dispositivos). */
+     * DeviceRoleManager — esta classe não enumera nem filtra dispositivos).
+     *
+     * DTR/RTS ativos resetam uma placa Arduino (Speeduino) via o circuito
+     * clássico de auto-reset — mesmo comportamento do TunerStudio ao
+     * conectar, então é esperado (confirmado com o usuário).
+     */
     public String open(UsbManager usbManager, UsbSerialDriver driver, int baudRate) throws IOException {
         UsbDevice device = driver.getDevice();
         String deviceName = device.getDeviceName() + " (" + driver.getClass().getSimpleName() + ")";
