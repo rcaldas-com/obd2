@@ -23,7 +23,18 @@ android {
 
     signingConfigs {
         debug {
-            // Forçar v1+v2 signing para compatibilidade com multimídias automotivas
+            // Forçar v1+v2 signing para compatibilidade com multimídias automotivas.
+            //
+            // Chave FIXA e versionada (não a default de ~/.android/debug.keystore,
+            // que é gerada por máquina): sem isso, cada máquina que builda o app
+            // (ou uma reinstalação do ambiente na mesma máquina) gera uma chave
+            // diferente, e instalar por cima de uma versão já presente no
+            // dispositivo falha silenciosamente ("app não instalado") por
+            // divergência de assinatura — sem desinstalar a versão antiga antes.
+            storeFile file('debug.keystore')
+            storePassword 'android'
+            keyAlias 'androiddebugkey'
+            keyPassword 'android'
         }
     }
 
