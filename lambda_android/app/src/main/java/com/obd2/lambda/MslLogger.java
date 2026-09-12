@@ -17,17 +17,33 @@ import java.util.Locale;
 /**
  * Grava um log combinado, no formato .msl do TunerStudio, misturando duas
  * fontes que atualizam em ritmos independentes: lambda banco 1/2 (só o OBD2
- * tem, já que as sondas estão ligadas na injeção original, não na
- * Speeduino) e RPM/MAP/TPS/etc "de verdade" (da Speeduino, que são os eixos
- * que os mapas dela usam). Também grava o ponto de ignição da ECU original
- * (OBD2) ao lado do ponto real aplicado pela Speeduino, pra comparar offline
- * e replicar manualmente célula por célula.
+ * tem, já que as sondas estão ligadas na injeção original, não na Speeduino)
+ * e RPM/MAP/TPS/CLT/IAT/baro (pressão + correção)/VE em uso/GammaE/lambda
+ * alvo/etanol "de verdade" (da Speeduino, que são os eixos e os valores que
+ * os mapas dela usam) — pensado pra corrigir tabela de VE offline. Baro
+ * importa porque pressão barométrica muda a mistura tanto quanto altitude/
+ * clima mudam de um dia pro outro — sem isso no log, uma diferença de
+ * mistura por causa do tempo vira "erro de VE" por engano. Lambda alvo, não
+ * AFR: AFR é relativo ao
+ * combustível (14,7:1 gasolina, ~9:1 etanol — não comparável direto entre
+ * tanques diferentes), lambda já normaliza isso. GammaE separa erro de VE de
+ * enriquecimento temporário tipo warmup/aceleração; "VE _Current" é a VE
+ * realmente usada no cálculo do PW, não a leitura crua da tabela (ve1Pct/
+ * ve2Pct) — é o que interessa pra corrigir. Sem ponto de ignição aqui — ver
+ * MainActivity/KnockWatch/IgnitionChartView pra isso, que é ao vivo, não por
+ * log (o recuo da original só faz sentido observado na hora, na condição
+ * real; analisar depois sem lembrar exatamente das condições de pista é o
+ * próprio problema que aquela tela existe pra evitar).
  *
  * Um HandlerThread próprio grava uma linha a cada 100ms (10Hz), sempre com
  * o último valor conhecido de cada fonte — os campos abaixo são atualizados
  * pelos loops de poll do ELM327 e da Speeduino (threads diferentes), por
  * isso `volatile`; não precisa de lock porque cada um só escreve o próprio
  * grupo de campos e o gravador só lê.
+ *
+ * Enquanto grava, o ELM327 fica dedicado a lambda banco 1/2 em qualquer tela
+ * (ver MainActivity#pollRunnable) — é a única fonte deles, e esse log
+ * precisa ao vivo, sem depender de qual tela ficou aberta.
  *
  * Formato do arquivo (conferido byte a byte contra um .msl real do
  * TunerStudio deste carro): 5 linhas de cabeçalho (assinatura, data+autor,
@@ -42,15 +58,19 @@ public class MslLogger {
     // a perda num desligamento abrupto sem gastar demais.
     private static final int SYNC_EVERY_N_ROWS = 10;
 
+    // RPMdot/MAPdot/TPSdot ficam no FIM da lista, depois de Ethanol —
+    // proposital: mantém a posição das colunas já existentes intacta pra
+    // qualquer análise que já leia log antigo por nome de coluna (não por
+    // posição) continuar funcionando igual em cima de logs novos.
     private static final String[] COLUMN_NAMES = {
-            "Time", "RPM", "MAP", "TPS", "CLT", "IAT", "Advance _Current",
-            "Baro Pressure", "VE1", "VE2", "AFR Target", "Battery V", "PW",
-            "Lambda", "Lambda2", "Advance_OBD2",
+            "Time", "RPM", "MAP", "TPS", "CLT", "IAT", "Baro Pressure", "Baro Correction",
+            "VE _Current", "GammaE", "Lambda Target", "Lambda", "Lambda2", "Ethanol",
+            "RPMdot", "MAPdot", "TPSdot",
     };
     private static final String[] COLUMN_UNITS = {
-            "s", "rpm", "kpa", "%", "", "", "deg",
-            "kpa", "%", "%", "O2", "V", "ms",
-            "O2", "O2", "deg",
+            "s", "rpm", "kpa", "%", "", "", "kpa", "%",
+            "%", "%", "O2", "O2", "O2", "%",
+            "rpm/s", "kpa/s", "%/s",
     };
 
     private final Context context;
@@ -65,7 +85,6 @@ public class MslLogger {
     // Última leitura conhecida de cada fonte — ver comentário da classe.
     private volatile Float lambda1;
     private volatile Float lambda2;
-    private volatile Float advanceObd2;
     private volatile SpeeduinoManager.SpeeduinoData speeduinoData;
 
     private final Runnable tickRunnable = new Runnable() {
@@ -81,18 +100,12 @@ public class MslLogger {
         this.context = context.getApplicationContext();
     }
 
-    /** Chamado pelo loop de poll do ELM327 sempre que lê lambda (tela do
-     * gráfico) — independe de estar gravando ou não. */
+    /** Chamado pelo loop de poll do ELM327 sempre que lê lambda — enquanto
+     * grava, isso acontece toda volta do loop não importa a tela ativa (ver
+     * MainActivity#pollRunnable), já que é a única fonte que existe. */
     public void updateObd2Lambda(Float bank1, Float bank2) {
         lambda1 = bank1;
         lambda2 = bank2;
-    }
-
-    /** Chamado pelo loop de poll do ELM327 no ciclo de baixa frequência
-     * (junto com bateria/temperatura) — ponto de ignição da ECU original,
-     * só como referência de comparação no log. */
-    public void updateObd2Advance(Float advance) {
-        advanceObd2 = advance;
     }
 
     /** Chamado pelo loop de poll da Speeduino a cada leitura. */
@@ -189,23 +202,27 @@ public class MslLogger {
         SpeeduinoManager.SpeeduinoData sd = speeduinoData;
         double t = (System.currentTimeMillis() - startTimeMillis) / 1000.0;
 
-        String line = String.format(Locale.US, "%.3f\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s",
+        String line = String.format(Locale.US, "%.3f\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s",
                 t,
                 sd != null && sd.rpm != null ? sd.rpm.toString() : "",
                 sd != null && sd.mapKpa != null ? String.valueOf(Math.round(sd.mapKpa)) : "",
                 sd != null && sd.tpsPct != null ? String.format(Locale.US, "%.1f", sd.tpsPct) : "",
                 sd != null && sd.coolantC != null ? String.valueOf(Math.round(sd.coolantC)) : "",
                 sd != null && sd.iatC != null ? String.valueOf(Math.round(sd.iatC)) : "",
-                sd != null && sd.advanceDeg != null ? String.valueOf(Math.round(sd.advanceDeg)) : "",
                 sd != null && sd.baroKpa != null ? String.valueOf(Math.round(sd.baroKpa)) : "",
-                sd != null && sd.ve1Pct != null ? sd.ve1Pct.toString() : "",
-                sd != null && sd.ve2Pct != null ? sd.ve2Pct.toString() : "",
-                sd != null && sd.afrTarget != null ? String.format(Locale.US, "%.1f", sd.afrTarget) : "",
-                sd != null && sd.batteryV != null ? String.format(Locale.US, "%.1f", sd.batteryV) : "",
-                sd != null && sd.pw1Ms != null ? String.format(Locale.US, "%.3f", sd.pw1Ms) : "",
+                sd != null && sd.baroCorrectionPct != null ? sd.baroCorrectionPct.toString() : "",
+                sd != null && sd.veCurr != null ? sd.veCurr.toString() : "",
+                sd != null && sd.gammaE != null ? sd.gammaE.toString() : "",
+                sd != null && sd.lambdaTarget != null ? String.format(Locale.US, "%.3f", sd.lambdaTarget) : "",
                 lambda1 != null ? String.format(Locale.US, "%.3f", lambda1) : "",
                 lambda2 != null ? String.format(Locale.US, "%.3f", lambda2) : "",
-                advanceObd2 != null ? String.format(Locale.US, "%.1f", advanceObd2) : ""
+                // O limite de detonação anda junto com o teor de álcool do
+                // tanque — mas isso é a tabela de VE, não a de ponto (que não
+                // entra aqui); etanol continua útil pra separar tank a tanque.
+                sd != null && sd.ethanolPct != null ? sd.ethanolPct.toString() : "",
+                sd != null && sd.rpmDot != null ? sd.rpmDot.toString() : "",
+                sd != null && sd.mapDot != null ? sd.mapDot.toString() : "",
+                sd != null && sd.tpsDot != null ? sd.tpsDot.toString() : ""
         );
 
         try {

@@ -10,6 +10,8 @@ import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.hardware.usb.UsbManager;
+import android.media.AudioManager;
+import android.media.ToneGenerator;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -51,12 +53,16 @@ public class MainActivity extends AppCompatActivity {
     // ser rápidas pro ajuste em tempo real). Também é a cadência dos alertas
     // nessa tela — pedido explicitamente em baixa frequência.
     private static final int ALERT_CHECK_INTERVAL_MS = 3000;
+    // Rotação/MAP/TPS pela ECU original na tela de ignição (só quando a
+    // Speeduino não está disponível) — ver readIgnitionContextStep.
+    private static final int IGNITION_CONTEXT_INTERVAL_MS = 500;
     private static final int REQUEST_LOCATION_PERMISSION = 1001;
 
     // UI Elements
     private TextView tvConnStatus, tvBatteryVoltage, tvRecIndicator;
-    private Button btnConnect, btnToggleScreen;
+    private Button btnConnect, btnToggleScreen, btnIgnitionRef;
     private LambdaChartView chartView;
+    private IgnitionChartView ignitionChartView;
     private DashboardView dashboardView;
     private View layoutDash;
     private LinearLayout layoutConnect;
@@ -79,8 +85,16 @@ public class MainActivity extends AppCompatActivity {
     private String previewPidId = null;
     private boolean previewRunning = false;
 
-    // Screen mode: false = lambda chart (default), true = dashboard
-    private boolean showingDashboard = false;
+    /**
+     * Telas que o botão de alternar percorre em ciclo. Cada uma manda numa
+     * cadência de leitura diferente do ELM327 (ver pollRunnable): LAMBDA lê só
+     * os dois PIDs de lambda, IGNICAO lê só o 010E — em ambos os casos pra
+     * manter a taxa alta no que a tela está mostrando —, e DASH lê o pacote
+     * lento de informações gerais.
+     */
+    private enum Screen { LAMBDA, IGNICAO, DASH }
+
+    private Screen screen = Screen.LAMBDA;
 
     // Logic
     private Elm327Manager elm327;
@@ -98,6 +112,18 @@ public class MainActivity extends AppCompatActivity {
     private boolean polling = false;
     private long lastAlertCheckTime = 0;
     private AlertManager alertManager;
+    private final KnockWatch knockWatch = new KnockWatch();
+    /** Última leitura da Speeduino, pra tela de ignição usar rotação/MAP/TPS
+     * sem gastar banda do ELM327 (a Speeduino tem porta e thread próprias). */
+    private volatile SpeeduinoManager.SpeeduinoData lastSpeeduinoData;
+    // Mesmos dados vindos da ECU original, pra tela de ignição continuar
+    // inteira quando a Speeduino estiver ocupada com o TunerStudio.
+    private Integer oemRpm;
+    private Float oemMapKpa;
+    private Float oemTpsPct;
+    private int ignitionContextStep = 0;
+    private long lastIgnitionContextTime = 0;
+    private ToneGenerator toneGenerator;
 
     private final BroadcastReceiver usbPermissionReceiver = new BroadcastReceiver() {
         @Override
@@ -188,8 +214,10 @@ public class MainActivity extends AppCompatActivity {
         tvRecIndicator = findViewById(R.id.tv_rec_indicator);
 
         chartView = findViewById(R.id.chart_view);
+        ignitionChartView = findViewById(R.id.ignition_chart_view);
         dashboardView = findViewById(R.id.dashboard_view);
         btnToggleScreen = findViewById(R.id.btn_toggle_screen);
+        btnIgnitionRef = findViewById(R.id.btn_ignition_ref);
 
         layoutAlerts = findViewById(R.id.layout_alerts);
         layoutAlertSettings = findViewById(R.id.layout_alert_settings);
@@ -221,6 +249,10 @@ public class MainActivity extends AppCompatActivity {
             showConnectView();
         });
         btnToggleScreen.setOnClickListener(v -> toggleScreen());
+        btnIgnitionRef.setOnClickListener(v -> {
+            knockWatch.toggleAnchor();
+            enableFullscreen();
+        });
         findViewById(R.id.btn_open_settings).setOnClickListener(v -> openAlertSettings());
         findViewById(R.id.btn_open_settings_from_connect).setOnClickListener(v -> openAlertSettings());
         findViewById(R.id.btn_save_alert_settings).setOnClickListener(v -> saveAlertSettings());
@@ -356,6 +388,10 @@ public class MainActivity extends AppCompatActivity {
                         speeduinoFailReason = "não respondeu ao handshake";
                         Log.w(TAG, "Speeduino conectada mas assinatura não confere — desconectando");
                         speeduino.disconnect();
+                    } else {
+                        // Uma vez só por conexão: stoich é config da tune, não
+                        // sai no bloco de status ao vivo (ver SpeeduinoManager).
+                        speeduino.readStoich();
                     }
                 } catch (IOException e) {
                     speeduinoFailReason = e.getMessage();
@@ -412,7 +448,32 @@ public class MainActivity extends AppCompatActivity {
         public void run() {
             if (!polling || !elm327.isConnected()) return;
 
-            if (showingDashboard) {
+            // Gravando, o ELM327 fica dedicado a lambda banco 1/2 o tempo
+            // todo, não importa a tela — é a única fonte que existe (as
+            // sondas estão na injeção original, não na Speeduino) e o log
+            // precisa disso ao vivo pra corrigir VE, não travado no último
+            // valor de quando a tela de lambda foi vista por último. A tela
+            // de ponto fica inacessível durante gravação (applyScreen já
+            // garante isso), então só resta decidir o que a tela de
+            // informações gerais mostra enquanto grava.
+            boolean recording = mslLogger.isRecording();
+
+            if (screen == Screen.LAMBDA || recording) {
+                final Elm327Manager.LambdaData data = elm327.readLambdaData();
+                mslLogger.updateObd2Lambda(data.o2s1Lambda, data.o2s5Lambda);
+
+                if (screen == Screen.LAMBDA) {
+                    uiHandler.post(() -> updateUI(data));
+                } else if (screen == Screen.DASH) {
+                    // Gravando com a tela de informações gerais na frente: nada de
+                    // consultar o ELM327 pros PIDs dela (CLT/IAT/velocidade), isso
+                    // atrasaria o lambda que o log está contando pra ter ao vivo.
+                    // A Speeduino e o GPS já entregam o essencial de graça, em
+                    // porta/thread própria, sem custo nenhum aqui.
+                    updateDashboardFromSpeeduinoAndGps();
+                }
+                pollSlowAlerts();
+            } else if (screen == Screen.DASH) {
                 final Elm327Manager.DashboardData data = elm327.readDashboardData();
                 // Dashboard já lê voltagem+temperatura toda vez (não faz PIDs de
                 // lambda), então os alertas usam esses mesmos dados; só os
@@ -422,29 +483,16 @@ public class MainActivity extends AppCompatActivity {
                     updateDashboardUI(data);
                     evaluateAlerts(data.batteryVoltage, data.coolantTemp, customValues);
                 });
-            } else {
-                final Elm327Manager.LambdaData data = elm327.readLambdaData();
-                uiHandler.post(() -> updateUI(data));
-
-                // Voltagem + temperatura + alertas personalizados em baixa
-                // frequência na tela do gráfico: consultas leves a cada
-                // ALERT_CHECK_INTERVAL_MS, pra manter a taxa de lambda alta e
-                // ainda assim os alertas funcionarem independente da tela ativa.
-                long now = System.currentTimeMillis();
-                if (now - lastAlertCheckTime >= ALERT_CHECK_INTERVAL_MS) {
-                    lastAlertCheckTime = now;
-                    final Float v = elm327.readBatteryVoltage();
-                    final Float temp = elm327.readCoolantTemp();
-                    // Ponto da ECU original — só usado como referência no
-                    // log .msl (a Speeduino é quem manda de verdade agora),
-                    // por isso lido na mesma cadência baixa da bateria/água.
-                    mslLogger.updateObd2Advance(elm327.readStockTimingAdvance());
-                    final Map<String, Float> customValues = readCustomAlertValues();
-                    uiHandler.post(() -> {
-                        if (v != null) setBatteryVoltage(v);
-                        evaluateAlerts(v, temp, customValues);
-                    });
-                }
+            } else { // Screen.IGNICAO — nunca alcançável gravando (ver applyScreen/toggleScreen)
+                // Só o 010E nessa tela: é UMA consulta por volta, então sai
+                // ainda mais rápido que a de lambda (que faz duas). O recuo de
+                // ponto da original é o evento que se está caçando aqui — a
+                // cadência lenta de antes (junto dos alertas, 3s) perdia o
+                // evento inteiro entre duas amostras.
+                final Float stockAdvance = elm327.readStockTimingAdvance();
+                readIgnitionContextStep();
+                updateIgnitionScreen(stockAdvance);
+                pollSlowAlerts();
             }
 
             if (polling) {
@@ -452,6 +500,150 @@ public class MainActivity extends AppCompatActivity {
             }
         }
     };
+
+    /**
+     * Tela de informações gerais durante gravação, sem tocar no ELM327: usa
+     * o que a Speeduino (porta própria, atualizando sempre) e o GPS já têm.
+     * Falta só o que nenhuma das duas tem sem OBD2 (nada crítico aqui —
+     * velocidade cai pro GPS, o resto é aproximação razoável do que a tela
+     * mostraria via ELM327).
+     */
+    private void updateDashboardFromSpeeduinoAndGps() {
+        SpeeduinoManager.SpeeduinoData sd = lastSpeeduinoData;
+        Elm327Manager.DashboardData data = new Elm327Manager.DashboardData();
+        data.timestamp = System.currentTimeMillis();
+        if (sd != null) {
+            data.rpm = sd.rpm;
+            data.coolantTemp = sd.coolantC;
+            data.intakeAirTemp = sd.iatC;
+            data.batteryVoltage = sd.batteryV;
+        }
+        Float gpsSpeed = gpsSpeedProvider != null ? gpsSpeedProvider.getSpeedKmh() : null;
+        if (gpsSpeed != null) data.speed = Math.round(gpsSpeed);
+
+        // Alertas personalizados ficam de fora aqui de propósito: são PID à
+        // parte (readCustomAlertValues), voltaria a consultar o ELM327.
+        // Voltagem/água continuam avaliados (vêm da Speeduino, de graça).
+        uiHandler.post(() -> {
+            updateDashboardUI(data);
+            evaluateAlerts(data.batteryVoltage, data.coolantTemp, Collections.emptyMap());
+        });
+    }
+
+    /**
+     * Consultas leves de fundo (voltagem, água, alertas personalizados) na
+     * cadência lenta — rodam em qualquer tela de gráfico pra não roubar banda
+     * do que a tela está mostrando, mas mantendo os alertas de temperatura e
+     * bateria vivos durante um teste de pista, que é justamente quando não se
+     * pode perder um aviso desses. Roda na thread do pollHandler.
+     */
+    private void pollSlowAlerts() {
+        long now = System.currentTimeMillis();
+        if (now - lastAlertCheckTime < ALERT_CHECK_INTERVAL_MS) return;
+        lastAlertCheckTime = now;
+
+        final Float v = elm327.readBatteryVoltage();
+        final Float temp = elm327.readCoolantTemp();
+        final Map<String, Float> customValues = readCustomAlertValues();
+        uiHandler.post(() -> {
+            if (v != null) setBatteryVoltage(v);
+            evaluateAlerts(v, temp, customValues);
+        });
+    }
+
+    /**
+     * Rotação/MAP/TPS pela ECU original, um PID por volta do loop — usados pra
+     * saber se a condição está estável quando a Speeduino NÃO está disponível
+     * (caso normal durante o ajuste: o TunerStudio no notebook fica com a porta
+     * serial dela, que é uma só). Um por volta, e não os três, porque o 010E é
+     * o que precisa de taxa alta aqui; estabilidade é um conceito de segundos,
+     * então ~3Hz em cada um destes sobra.
+     */
+    private void readIgnitionContextStep() {
+        // Com a Speeduino conectada ela já dá rotação/MAP/TPS de graça (porta
+        // própria), então nem consulta a original — o ELM327 fica 100% no 010E.
+        if (speeduino.isConnected() && lastSpeeduinoData != null) return;
+
+        // Sem ela, ainda assim espaça as consultas: estabilidade é medida numa
+        // janela de segundos, então ~1 leitura de cada a cada 1,5s sobra, e o
+        // 010E (que é o sinal que se está caçando) mantém a taxa cheia.
+        long now = System.currentTimeMillis();
+        if (now - lastIgnitionContextTime < IGNITION_CONTEXT_INTERVAL_MS) return;
+        lastIgnitionContextTime = now;
+
+        switch (ignitionContextStep++ % 3) {
+            case 0: {
+                Float v = elm327.readGenericPid(ObdPid.get("010C"));
+                if (v != null) oemRpm = Math.round(v);
+                break;
+            }
+            case 1: {
+                Float v = elm327.readGenericPid(ObdPid.get("010B"));
+                if (v != null) oemMapKpa = v;
+                break;
+            }
+            default: {
+                Float v = elm327.readGenericPid(ObdPid.get("0111"));
+                if (v != null) oemTpsPct = v;
+                break;
+            }
+        }
+    }
+
+    /**
+     * Cruza o ponto recém-lido da original com rotação/MAP/TPS, roda a detecção
+     * de recuo e joga tudo na tela. Chamado da thread do pollHandler; só o
+     * desenho vai pra thread de UI.
+     *
+     * A condição é medida pela Speeduino quando ela está conectada (é a carga
+     * que os mapas dela usam de verdade), e pela ECU original quando não está —
+     * o que mantém a tela inteira funcional com só o ELM327 plugado, que é o
+     * cenário de ajustar o ponto pelo TunerStudio com a serial da Speeduino
+     * ocupada.
+     */
+    private void updateIgnitionScreen(Float stockAdvance) {
+        SpeeduinoManager.SpeeduinoData sd = speeduino.isConnected() ? lastSpeeduinoData : null;
+        Float speeduinoAdvance = sd != null ? sd.advanceDeg : null;
+
+        Integer rpm = sd != null && sd.rpm != null ? sd.rpm : oemRpm;
+        Float map = sd != null && sd.mapKpa != null ? sd.mapKpa : oemMapKpa;
+        Float tps = sd != null && sd.tpsPct != null ? sd.tpsPct : oemTpsPct;
+
+        final KnockWatch.Status st = knockWatch.update(
+                System.currentTimeMillis(), stockAdvance, rpm, map, tps);
+
+        // Copia o que a UI precisa: o Status é reaproveitado a cada volta.
+        final KnockWatch.State state = st.state;
+        final Float reference = st.reference;
+        final Float drop = st.dropDeg;
+        final boolean locked = knockWatch.isAnchorLocked();
+        final boolean fired = st.eventJustFired;
+
+        uiHandler.post(() -> {
+            ignitionChartView.addData(stockAdvance, speeduinoAdvance);
+            ignitionChartView.updateStatus(state, reference, drop, locked);
+            if (fired) beepKnockEvent();
+        });
+    }
+
+    /**
+     * Bipe curto no instante em que a original recua — o ajuste é feito com o
+     * carro em movimento, então o evento precisa chamar atenção sem depender
+     * de alguém estar olhando o gráfico naquele segundo. Uma vez por evento
+     * (o KnockWatch só marca a transição), nunca por amostra.
+     */
+    private void beepKnockEvent() {
+        try {
+            if (toneGenerator == null) {
+                toneGenerator = new ToneGenerator(AudioManager.STREAM_NOTIFICATION, 80);
+            }
+            toneGenerator.startTone(ToneGenerator.TONE_PROP_BEEP2, 250);
+        } catch (RuntimeException e) {
+            // Multimídia de carro nem sempre expõe o stream esperado; o aviso
+            // visual (tarja + borda vermelha) já cobre o caso.
+            Log.w(TAG, "Sem áudio pro aviso de recuo: " + e.getMessage());
+        }
+    }
 
     private void startSpeeduinoPolling() {
         if (speeduinoPolling) return;
@@ -475,6 +667,7 @@ public class MainActivity extends AppCompatActivity {
 
             final SpeeduinoManager.SpeeduinoData data = speeduino.readOutputChannels();
             mslLogger.updateSpeeduino(data);
+            lastSpeeduinoData = data;
             uiHandler.post(() -> dashboardView.updateSpeeduinoData(data));
 
             if (speeduinoPolling) {
@@ -772,11 +965,20 @@ public class MainActivity extends AppCompatActivity {
         if (mslLogger.isRecording()) {
             mslLogger.stop();
             updateMslLogButtonUi();
+            applyScreen(); // libera a tela de ponto de novo — atualiza o rótulo do botão de trocar tela
             return;
         }
         try {
             String filename = mslLogger.start();
             Toast.makeText(this, "Gravando: " + filename, Toast.LENGTH_SHORT).show();
+            // Ponto não entra mais nesse log (ver MslLogger) e a tela dele
+            // disputaria a mesma porta serial que o lambda precisa agora —
+            // se estava nela por baixo das Configurações, tira de lá; e o
+            // rótulo do botão de trocar tela precisa refletir isso já.
+            if (screen == Screen.IGNICAO) {
+                screen = Screen.LAMBDA;
+            }
+            applyScreen();
         } catch (IOException e) {
             Toast.makeText(this, "Erro ao iniciar log: " + e.getMessage(), Toast.LENGTH_SHORT).show();
         }
@@ -901,19 +1103,47 @@ public class MainActivity extends AppCompatActivity {
         renderCustomRulesList();
     }
 
+    /** Ciclo: lambda → ignição → informações gerais → lambda. */
+    /** Ciclo: lambda → ponto → informações gerais → lambda — pulando ponto
+     * enquanto uma gravação estiver em andamento (ver applyScreen). */
     private void toggleScreen() {
-        showingDashboard = !showingDashboard;
+        switch (screen) {
+            case LAMBDA:
+                screen = mslLogger.isRecording() ? Screen.DASH : Screen.IGNICAO;
+                break;
+            case IGNICAO: screen = Screen.DASH; break;
+            default: screen = Screen.LAMBDA; break;
+        }
+        applyScreen();
+    }
 
-        // Voltagem fica visível nas duas telas.
+    private void applyScreen() {
+        // Voltagem fica visível em todas as telas.
         tvBatteryVoltage.setVisibility(View.VISIBLE);
-        if (showingDashboard) {
-            chartView.setVisibility(View.GONE);
-            dashboardView.setVisibility(View.VISIBLE);
-            btnToggleScreen.setText("λ");
-        } else {
-            chartView.setVisibility(View.VISIBLE);
-            dashboardView.setVisibility(View.GONE);
-            btnToggleScreen.setText("⚙");
+
+        chartView.setVisibility(screen == Screen.LAMBDA ? View.VISIBLE : View.GONE);
+        ignitionChartView.setVisibility(screen == Screen.IGNICAO ? View.VISIBLE : View.GONE);
+        dashboardView.setVisibility(screen == Screen.DASH ? View.VISIBLE : View.GONE);
+        btnIgnitionRef.setVisibility(screen == Screen.IGNICAO ? View.VISIBLE : View.GONE);
+
+        // O texto do botão anuncia a PRÓXIMA tela do ciclo. Só glifos que
+        // existem em fonte de Android 5 (a multimídia é antiga): "°" é
+        // Latin-1, ao contrário de um raio/emoji, que sairia quadradinho.
+        // Gravando, o clique a partir de λ pula direto pra informações
+        // gerais (ver toggleScreen) — o rótulo tem que anunciar isso, não "°".
+        boolean skipIgnicao = mslLogger.isRecording();
+        switch (screen) {
+            case LAMBDA: btnToggleScreen.setText(skipIgnicao ? "⚙" : "°"); break;
+            case IGNICAO: btnToggleScreen.setText("⚙"); break;
+            default: btnToggleScreen.setText("λ"); break;
+        }
+
+        if (screen == Screen.IGNICAO) {
+            // Entrando na tela: o histórico anterior é de outra condição de
+            // rodagem (e possivelmente de minutos atrás) — começar limpo evita
+            // uma referência fixada em cima de dado velho.
+            knockWatch.reset();
+            ignitionChartView.clearData();
         }
     }
 
@@ -923,14 +1153,14 @@ public class MainActivity extends AppCompatActivity {
         btnConnect.setEnabled(true);
         btnConnect.setText("CONECTAR");
         chartView.clearData();
+        ignitionChartView.clearData();
         dashboardView.clearData();
         dashboardView.clearSpeeduinoData();
+        knockWatch.reset();
         updateAlertBanners(Collections.emptyList());
         // Reset para tela de lambda como padrão
-        showingDashboard = false;
-        chartView.setVisibility(View.VISIBLE);
-        dashboardView.setVisibility(View.GONE);
-        btnToggleScreen.setText("⚙");
+        screen = Screen.LAMBDA;
+        applyScreen();
     }
 
     private void showDashView() {

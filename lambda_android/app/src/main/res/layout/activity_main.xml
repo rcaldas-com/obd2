@@ -123,6 +123,23 @@
                 android:textColor="#55FFFFFF"
                 android:textSize="28sp"/>
 
+            <!-- Fixa/solta a referência de ponto na tela de ignição; só
+                 aparece nela (MainActivity controla a visibilidade). -->
+            <Button
+                android:id="@+id/btn_ignition_ref"
+                android:layout_width="72dp"
+                android:layout_height="72dp"
+                android:text="REF"
+                android:textSize="18sp"
+                android:textColor="#55FFFFFF"
+                android:background="@android:color/transparent"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:gravity="center"
+                android:padding="0dp"
+                android:layout_marginLeft="8dp"
+                android:visibility="gone"/>
+
             <Button
                 android:id="@+id/btn_toggle_screen"
                 android:layout_width="72dp"
@@ -144,6 +161,14 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:layout_above="@id/layout_bottom_bar"/>
+
+        <!-- Gráfico de ponto de ignição: mesmo espaço, começa invisível -->
+        <com.obd2.lambda.IgnitionChartView
+            android:id="@+id/ignition_chart_view"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_above="@id/layout_bottom_bar"
+            android:visibility="gone"/>
 
         <!-- Dashboard ocupa o mesmo espaço, começa invisível -->
         <com.obd2.lambda.DashboardView

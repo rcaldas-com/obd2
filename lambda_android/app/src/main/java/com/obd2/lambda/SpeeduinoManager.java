@@ -50,6 +50,11 @@ public class SpeeduinoManager {
 
     private final UsbSerialSession session = new UsbSerialSession();
     private boolean connected = false;
+    // Relação estequiométrica configurada na tune (página 1, offset 50) —
+    // não é telemetria ao vivo, é config; lida uma vez por conexão em
+    // readStoich() e reaproveitada em todo readOutputChannels() daí em
+    // diante pra calcular lambdaTarget = afrTarget / stoich.
+    private volatile Float stoich;
 
     /** Um "snapshot" decodificado do bloco de status da Speeduino. Campos
      * cobrem os bytes 0-41 do bloco (mais alguns pontuais como PW/advance1-2/
@@ -63,18 +68,25 @@ public class SpeeduinoManager {
         public Float coolantC;
         public Float batteryV;
         public Float afrNative;       // O2 nativo da Speeduino (sem sonda ligada nesta instalação — só referência)
-        public Integer ve1Pct;
-        public Integer ve2Pct;
+        public Integer ve1Pct;         // tabela banco 1 (referência apenas — ver veCurr)
+        public Integer ve2Pct;         // tabela banco 2 (referência apenas — ver veCurr)
+        public Integer veCurr;        // VE realmente usada no cálculo do PW nesse instante (o que TunerStudio chama "VE (Current)")
+        public Integer gammaE;         // % de correção de combustível total aplicada (warmup/AE/etc) — precisa pra separar erro de VE de enriquecimento temporário ao analisar o log
         public Float afrTarget;
+        public Float lambdaTarget;    // afrTarget / stoich (stoich é config da tune, lido uma vez — ver readStoich)
         public Float advanceDeg;      // ponto de ignição REAL aplicado pela Speeduino (signed)
         public Float tpsPct;
         public Float baroKpa;
+        public Integer baroCorrectionPct; // correção de mistura por pressão barométrica que a própria Speeduino já aplica
         public Integer ethanolPct;    // sensor flex
         public Float pw1Ms;
         public Float pw2Ms;
         public Float dwellMs;
         public Float advance1Deg;
         public Float advance2Deg;
+        public Integer tpsDot;   // %/s — solta o acelerador de repente dá negativo
+        public Integer rpmDot;   // rpm/s — rotação caindo dá negativo
+        public Integer mapDot;   // kPa/s — vácuo subindo (mais negativo = MAP caindo) dá negativo
         public long timestamp;
     }
 
@@ -134,6 +146,48 @@ public class SpeeduinoManager {
         }
     }
 
+    /**
+     * Lê um byte de uma página de configuração da tune (comando 'p' —
+     * mesmo envelope tamanho+payload+CRC32 do 'r', só trocando a tabela de
+     * output channels por número de página; comms.cpp confirma o payload
+     * idêntico: tsCanId, página, offset little-endian, tamanho
+     * little-endian). Usado só pra valores fixos da tune que não saem no
+     * bloco de status ao vivo, como o stoich configurado.
+     */
+    private Integer readPageByte(int page, int offset) {
+        if (!isConnected()) return null;
+        try {
+            byte[] payload = new byte[]{
+                    'p',
+                    (byte) TS_CAN_ID,
+                    (byte) page,
+                    (byte) (offset & 0xFF), (byte) ((offset >> 8) & 0xFF),
+                    (byte) 1, (byte) 0, // length = 1 byte
+            };
+            byte[] response = sendCommand(payload);
+            if (response == null || response.length < 2 || response[0] != SERIAL_RC_OK) {
+                return null;
+            }
+            return response[1] & 0xFF;
+        } catch (IOException e) {
+            Log.w(TAG, "Falha ao ler página " + page + " offset " + offset + ": " + e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Lê o stoich configurado na tune (página 1, offset 50 — conferido
+     * contra mainController.ini deste carro: "stoich = scalar, U08, 50,
+     * ':1', 0.1"). Não é telemetria, é config — chamar uma vez por conexão
+     * (depois de verifySignature() confirmar que é mesmo a Speeduino), não
+     * a cada leitura. Se falhar, lambdaTarget fica null em vez de usar um
+     * valor errado — melhor faltar a coluna que mentir nela.
+     */
+    public void readStoich() {
+        Integer raw = readPageByte(1, 50);
+        stoich = raw != null ? raw * 0.1f : null;
+    }
+
     /** Lê e decodifica o bloco de dados ao vivo inteiro (130 bytes). */
     public SpeeduinoData readOutputChannels() {
         SpeeduinoData data = new SpeeduinoData();
@@ -171,18 +225,47 @@ public class SpeeduinoManager {
         data.batteryV = u8(block, 9) * 0.1f;
         data.afrNative = u8(block, 10) * 0.1f;
         data.rpm = u16le(block, 14);
+        // offset 17 (U16, escala 1.0) — conferido contra
+        // mainController.ini deste carro: "gammaEnrich = scalar, U16, 17".
+        data.gammaE = u16le(block, 17);
         data.ve1Pct = u8(block, 19);
         data.ve2Pct = u8(block, 20);
         data.afrTarget = u8(block, 21) * 0.1f;
+        // stoich vem de config (readStoich), não do bloco de status — sem
+        // ele lido ainda (ou se a leitura falhou), fica null em vez de usar
+        // um valor chutado.
+        Float stoichNow = stoich;
+        data.lambdaTarget = stoichNow != null ? data.afrTarget / stoichNow : null;
+        // offset 22 (S16, escala 1.0) — conferido contra speeduino.ini:
+        // "TPSdot = scalar, S16, 22". Solta o acelerador de repente dá
+        // negativo — é o caso que importa enxergar, por isso o s16le.
+        data.tpsDot = s16le(block, 22);
         data.advanceDeg = (float) s8(block, 24);
         data.tpsPct = u8(block, 25) * 0.5f;
+        // offset 33 (S16, escala 1.0) — conferido contra speeduino.ini:
+        // "rpmDOT = scalar, S16, 33". Rotação caindo dá negativo.
+        data.rpmDot = s16le(block, 33);
         data.ethanolPct = u8(block, 35);
         data.baroKpa = (float) u8(block, 41);
         data.pw1Ms = u16le(block, 76) * 0.001f;
         data.pw2Ms = u16le(block, 78) * 0.001f;
         data.dwellMs = u16le(block, 90) * 0.001f;
+        // offset 93 (S16, escala 1.0) — conferido contra speeduino.ini:
+        // "MAPdot = scalar, S16, 93". Vácuo subindo (MAP caindo) dá negativo.
+        data.mapDot = s16le(block, 93);
         data.advance1Deg = (float) s8(block, 118);
         data.advance2Deg = (float) s8(block, 119);
+        // offset 101 (U08, escala 1.0) — conferido contra mainController.ini:
+        // "baroCorrection = scalar, U08, 101". Correção de mistura por
+        // pressão barométrica que a própria Speeduino já aplica — junto com
+        // baroKpa (offset 41, acima) pra corrigir a VE de verdade, já que a
+        // pressão muda de dia pra dia e de altitude pra altitude.
+        data.baroCorrectionPct = u8(block, 101);
+        // offset 102 (U08, escala 1.0) — conferido contra mainController.ini:
+        // "veCurr = scalar, U08, 102". É a VE realmente usada no cálculo do
+        // PW nesse instante — diferente de ve1Pct/ve2Pct, que são só a
+        // leitura crua da célula da tabela.
+        data.veCurr = u8(block, 102);
     }
 
     // offset é relativo ao bloco de status (0-based); +1 pula o SERIAL_RC_OK.
@@ -196,6 +279,13 @@ public class SpeeduinoManager {
 
     private static int u16le(byte[] block, int offset) {
         return u8(block, offset) | (u8(block, offset + 1) << 8);
+    }
+
+    // short com sinal — necessário pra rpmDOT/TPSdot/MAPdot, que ficam
+    // negativos exatamente nos casos que importam (rotação caindo, vácuo
+    // subindo, solta o acelerador de repente).
+    private static int s16le(byte[] block, int offset) {
+        return (short) (u8(block, offset) | (u8(block, offset + 1) << 8));
     }
 
     // Folga generosa pro maior pacote possível (tamanho[2] + SERIAL_RC_OK(1)
