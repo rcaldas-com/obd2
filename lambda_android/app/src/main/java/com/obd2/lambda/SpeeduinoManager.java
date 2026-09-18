@@ -72,6 +72,12 @@ public class SpeeduinoManager {
         public Integer ve2Pct;         // tabela banco 2 (referência apenas — ver veCurr)
         public Integer veCurr;        // VE realmente usada no cálculo do PW nesse instante (o que TunerStudio chama "VE (Current)")
         public Integer gammaE;         // % de correção de combustível total aplicada (warmup/AE/etc) — precisa pra separar erro de VE de enriquecimento temporário ao analisar o log
+        public Integer dfco;          // 1 = corte de combustível na desaceleração ativo (status1 bit 4) — marcador confiável de corte, ao contrário do lambda, que chega atrasado
+        public Integer engineStatus;  // byte de flags cru (offset 2): bit0 running, bit1 crank, bit2 ASE,
+                                      // bit3 warmup, bit4 AE por TPS ativo, bit5 enleanment de desaceleração,
+                                      // bit6 AE por MAP ativo, bit7 enleanment por MAP. Vai cru pro log pra
+                                      // não perder nenhuma e o filtro decidir o que usar.
+        public Float accelEnrichPct;  // % de enriquecimento de aceleração aplicado (100 = neutro)
         public Float afrTarget;
         public Float lambdaTarget;    // afrTarget / stoich (stoich é config da tune, lido uma vez — ver readStoich)
         public Float advanceDeg;      // ponto de ignição REAL aplicado pela Speeduino (signed)
@@ -219,6 +225,13 @@ public class SpeeduinoManager {
      * (documentados a partir de 0) ficam em block[offset + 1]. */
     private void parseBlock(byte[] block, SpeeduinoData data) {
         data.secl = u8(block, 0);
+        // offsets 1, 2 e 16 — conferidos contra speeduino.ini: "DFCOOn =
+        // bits, U08, 1, [4:4]", o bloco de flags "engine" em U08 offset 2, e
+        // "accelEnrich = scalar, U08, 16" com escala 2.0. Custam zero: já
+        // chegavam a cada poll e eram descartados.
+        data.dfco = (u8(block, 1) >> 4) & 0x01;
+        data.engineStatus = u8(block, 2);
+        data.accelEnrichPct = u8(block, 16) * 2.0f;
         data.mapKpa = (float) u16le(block, 4);
         data.iatC = u8(block, 6) - 40f;
         data.coolantC = u8(block, 7) - 40f;

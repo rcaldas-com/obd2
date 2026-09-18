@@ -65,12 +65,12 @@ public class MslLogger {
     private static final String[] COLUMN_NAMES = {
             "Time", "RPM", "MAP", "TPS", "CLT", "IAT", "Baro Pressure", "Baro Correction",
             "VE _Current", "GammaE", "Lambda Target", "Lambda", "Lambda2", "Ethanol",
-            "RPMdot", "MAPdot", "TPSdot",
+            "RPMdot", "MAPdot", "TPSdot", "DFCO", "Engine Status", "Accel Enrich",
     };
     private static final String[] COLUMN_UNITS = {
             "s", "rpm", "kpa", "%", "", "", "kpa", "%",
             "%", "%", "O2", "O2", "O2", "%",
-            "rpm/s", "kpa/s", "%/s",
+            "rpm/s", "kpa/s", "%/s", "", "bits", "%",
     };
 
     private final Context context;
@@ -81,6 +81,13 @@ public class MslLogger {
     private long startTimeMillis;
     private int rowsSinceSync = 0;
     private volatile boolean recording = false;
+    // Pausa sem fechar o arquivo: o Time (relógio de parede desde o start)
+    // continua correndo, então uma pausa aparece no .msl como um salto no
+    // tempo entre duas linhas — não como se o trecho nunca tivesse
+    // acontecido. É proposital: dá pra pausar de qualquer tela (trânsito,
+    // semáforo, oscilação) pra não gravar lixo, sem perder a correlação com
+    // o relógio real caso precise cruzar com outra coisa depois.
+    private volatile boolean paused = false;
 
     // Última leitura conhecida de cada fonte — ver comentário da classe.
     private volatile Float lambda1;
@@ -91,7 +98,7 @@ public class MslLogger {
         @Override
         public void run() {
             if (!recording) return;
-            writeRow();
+            if (!paused) writeRow();
             handler.postDelayed(this, TICK_MS);
         }
     };
@@ -117,6 +124,20 @@ public class MslLogger {
         return recording;
     }
 
+    public boolean isPaused() {
+        return paused;
+    }
+
+    /** Pausa sem fechar o arquivo — próxima linha só quando resume() for
+     * chamado. Sem efeito se não estiver gravando. */
+    public void pause() {
+        if (recording) paused = true;
+    }
+
+    public void resume() {
+        paused = false;
+    }
+
     /** Inicia uma gravação nova, cria o arquivo e escreve o cabeçalho.
      * @return nome do arquivo criado (pra mostrar na UI) */
     public String start() throws IOException {
@@ -139,6 +160,7 @@ public class MslLogger {
         startTimeMillis = System.currentTimeMillis();
         rowsSinceSync = 0;
         recording = true;
+        paused = false;
 
         thread = new HandlerThread("MslLogger");
         thread.start();
@@ -151,6 +173,7 @@ public class MslLogger {
 
     public void stop() {
         recording = false;
+        paused = false;
         if (thread != null) {
             thread.quitSafely();
             thread = null;
@@ -202,7 +225,7 @@ public class MslLogger {
         SpeeduinoManager.SpeeduinoData sd = speeduinoData;
         double t = (System.currentTimeMillis() - startTimeMillis) / 1000.0;
 
-        String line = String.format(Locale.US, "%.3f\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s",
+        String line = String.format(Locale.US, "%.3f\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s",
                 t,
                 sd != null && sd.rpm != null ? sd.rpm.toString() : "",
                 sd != null && sd.mapKpa != null ? String.valueOf(Math.round(sd.mapKpa)) : "",
@@ -222,7 +245,10 @@ public class MslLogger {
                 sd != null && sd.ethanolPct != null ? sd.ethanolPct.toString() : "",
                 sd != null && sd.rpmDot != null ? sd.rpmDot.toString() : "",
                 sd != null && sd.mapDot != null ? sd.mapDot.toString() : "",
-                sd != null && sd.tpsDot != null ? sd.tpsDot.toString() : ""
+                sd != null && sd.tpsDot != null ? sd.tpsDot.toString() : "",
+                sd != null && sd.dfco != null ? sd.dfco.toString() : "",
+                sd != null && sd.engineStatus != null ? sd.engineStatus.toString() : "",
+                sd != null && sd.accelEnrichPct != null ? String.format(Locale.US, "%.0f", sd.accelEnrichPct) : ""
         );
 
         try {

@@ -123,6 +123,25 @@
                 android:textColor="#55FFFFFF"
                 android:textSize="28sp"/>
 
+            <!-- Pausa/retoma a gravação ATUAL sem fechar o arquivo — aparece
+                 em qualquer tela enquanto estiver gravando (MainActivity
+                 controla visibilidade e texto: "II" pausar, ">" retomar). -->
+            <Button
+                android:id="@+id/btn_pause_log"
+                android:layout_width="72dp"
+                android:layout_height="72dp"
+                android:text="II"
+                android:textSize="22sp"
+                android:textStyle="bold"
+                android:textColor="#FF5252"
+                android:background="@android:color/transparent"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:gravity="center"
+                android:padding="0dp"
+                android:layout_marginLeft="8dp"
+                android:visibility="gone"/>
+
             <!-- Fixa/solta a referência de ponto na tela de ignição; só
                  aparece nela (MainActivity controla a visibilidade). -->
             <Button

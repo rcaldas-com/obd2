@@ -60,7 +60,7 @@ public class MainActivity extends AppCompatActivity {
 
     // UI Elements
     private TextView tvConnStatus, tvBatteryVoltage, tvRecIndicator;
-    private Button btnConnect, btnToggleScreen, btnIgnitionRef;
+    private Button btnConnect, btnToggleScreen, btnIgnitionRef, btnPauseLog;
     private LambdaChartView chartView;
     private IgnitionChartView ignitionChartView;
     private DashboardView dashboardView;
@@ -218,6 +218,7 @@ public class MainActivity extends AppCompatActivity {
         dashboardView = findViewById(R.id.dashboard_view);
         btnToggleScreen = findViewById(R.id.btn_toggle_screen);
         btnIgnitionRef = findViewById(R.id.btn_ignition_ref);
+        btnPauseLog = findViewById(R.id.btn_pause_log);
 
         layoutAlerts = findViewById(R.id.layout_alerts);
         layoutAlertSettings = findViewById(R.id.layout_alert_settings);
@@ -252,6 +253,14 @@ public class MainActivity extends AppCompatActivity {
         btnIgnitionRef.setOnClickListener(v -> {
             knockWatch.toggleAnchor();
             enableFullscreen();
+        });
+        btnPauseLog.setOnClickListener(v -> {
+            if (mslLogger.isPaused()) {
+                mslLogger.resume();
+            } else {
+                mslLogger.pause();
+            }
+            updateMslLogButtonUi();
         });
         findViewById(R.id.btn_open_settings).setOnClickListener(v -> openAlertSettings());
         findViewById(R.id.btn_open_settings_from_connect).setOnClickListener(v -> openAlertSettings());
@@ -985,23 +994,34 @@ public class MainActivity extends AppCompatActivity {
         updateMslLogButtonUi();
     }
 
-    /** Atualiza o botão/status enquanto a tela de Configurações estiver
-     * aberta — sem tique automático: o texto reflete o estado só quando a
-     * tela é (re)aberta ou o botão é tocado, suficiente pro caso de uso
-     * (gravação é um "liga/desliga" ocasional, não precisa de cronômetro
-     * ao vivo). */
+    /** Atualiza o botão de start/stop (Configurações), o botão de
+     * pausar/retomar e o indicador REC/PAUSA — os dois últimos visíveis em
+     * qualquer tela, chamado depois de qualquer mudança de estado do
+     * MslLogger (start, stop, pause, resume). Sem tique automático: reflete
+     * o estado só quando algo muda, suficiente pro caso de uso. */
     private void updateMslLogButtonUi() {
         boolean recording = mslLogger.isRecording();
+        boolean paused = mslLogger.isPaused();
         if (recording) {
             btnMslLog.setText("Parar gravação");
-            tvMslLogStatus.setText("Gravando…");
+            tvMslLogStatus.setText(paused ? "Pausado" : "Gravando…");
         } else {
             btnMslLog.setText("Gravar log");
             tvMslLogStatus.setText("");
         }
         // Visível em cima do dashboard/gráfico também, não só aqui dentro
-        // de Configurações — pra não esquecer que está gravando.
+        // de Configurações — pra não esquecer que está gravando/pausado.
         tvRecIndicator.setVisibility(recording ? View.VISIBLE : View.GONE);
+        if (recording) {
+            tvRecIndicator.setText(paused ? "II PAUSA" : "● REC");
+            tvRecIndicator.setTextColor(paused ? Color.parseColor("#FFD54F") : Color.parseColor("#FF5252"));
+        }
+
+        // Botão de pausar/retomar: só existe enquanto grava — não faz
+        // sentido pausar uma gravação que não está acontecendo.
+        btnPauseLog.setVisibility(recording ? View.VISIBLE : View.GONE);
+        btnPauseLog.setText(paused ? ">" : "II");
+        btnPauseLog.setTextColor(paused ? Color.parseColor("#81C784") : Color.parseColor("#FF5252"));
     }
 
     // ---- Adicionar alerta personalizado (escolha de PID) ----
