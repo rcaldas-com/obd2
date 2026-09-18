@@ -165,10 +165,115 @@ fazia I/O síncrono na thread de UI). O `.msl` tem `fsync` periódico e um
 `BroadcastReceiver` de `ACTION_SHUTDOWN` pra sobreviver a corte de energia, e um
 indicador "REC" nas telas.
 
-Colunas incluem `Advance _Current` (Speeduino), `Advance_OBD2` (original) e
-`Ethanol` — esta última porque **o limite de detonação anda junto com o teor de
-álcool do tanque**, então um ponto medido só significa alguma coisa etiquetado
-com o etanol daquele momento.
+**O log é hoje pra corrigir VE, não ponto** (ponto é ao vivo — ver a tela
+acima; o log já teve `Advance _Current`/`Advance_OBD2`, foram removidas).
+Colunas atuais, todas da Speeduino exceto Lambda/Lambda2 (que só o ELM327 tem,
+sondas na injeção original):
+
+`Time, RPM, MAP, TPS, CLT, IAT, Baro Pressure, Baro Correction, VE _Current,
+GammaE, Lambda Target, Lambda, Lambda2, Ethanol, RPMdot, MAPdot, TPSdot, DFCO,
+Engine Status, Accel Enrich`
+
+- **VE _Current**, não VE1/VE2: é a VE realmente usada no cálculo do PW, as
+  outras são só a leitura crua da tabela.
+- **Lambda Target**, não AFR: AFR não é comparável entre etanol/gasolina;
+  calculado como `afrTarget / stoich`, e `stoich` é config da tune (não sai no
+  bloco ao vivo) — lido uma vez por conexão via comando de leitura de página
+  `'p'` (`SpeeduinoManager.readStoich()`, página 1 offset 50).
+- **DFCO** (byte 1 bit 4), **Engine Status** (byte 2 cru — running/crank/ASE/
+  warmup/AE por TPS/enleanment de desaceleração/AE por MAP/enleanment por MAP)
+  e **Accel Enrich** (byte 16, %): decodificadas pra filtrar corte/transitório
+  com precisão, sem depender de olhar o GammaE cru (que carrega correções
+  legítimas de flex/IAT/CLT junto, então nem sempre fica perto de 100 — ver
+  seção de VE abaixo).
+- **MAPdot vem sempre zero** — o firmware só calcula quando `aeMode = MAP` na
+  tune; este carro usa `aeMode = TPS`. Não é bug, é peso morto nesta config.
+
+## Acerto de tabela VE a partir do log — ferramenta e achados
+
+Objetivo: usar os logs pra corrigir a tabela VE (motor tunado com 35% de
+etanol, tabela original não reflete isso direito). Fica em `filter_log/`
+(ignorado no git — são dados de teste, não código; ver `.gitignore`).
+
+**`filter_log/ve_filter.py`** — filtra um `.msl` deixando só os momentos
+utilizáveis, com **peso contínuo (0-1) por amostra**, não corte binário: o que
+estraga uma leitura não é estar variando agora, é ter variado há pouco e a
+sonda ainda não ter alcançado.
+
+- Descarte duro: DFCO, AE/enleanment ativo (via `Engine Status`/`DFCO`; em log
+  antigo sem essas colunas, cai pro fallback `GammaE == 0` — mais fraco, só
+  pega corte, não AE/enleanment isolado), ASE/warmup, motor frio (CLT < 70°C),
+  lambda fora de 0,6-1,6.
+- Janela de assentamento depois de qualquer um desses (1,5s + rampa de 1,5s) —
+  sem isso sobra "eco" do transitório mesmo com a flag já desarmada.
+- Atraso da sonda **variável**, não fixo: escala com o inverso do fluxo
+  (rotação × MAP), ancorado em 0,8s a 1800rpm/45kPa (valor que
+  `ve_map_optimizer.py` já estimava fixo pelo DFCO).
+- Peso cai com |RPMdot| e com variação do MAP numa janela de 1s.
+- Roda com `--tune CurrentTune.msq` pra cobertura por célula nos bins reais e
+  aviso de bins finos demais (lê a resolução do sensor MAP da própria tune —
+  `mapMin`/`mapMax` da calibração, não hardcoded, funciona pra qualquer
+  sensor/carro); sem `--tune`, ainda sai distribuição e sugestão de bins.
+- Gera um `.msl` novo só com as amostras aprovadas + coluna `FilterWeight`,
+  pra abrir no MegaLogViewer.
+- **Limiar padrão: peso ≥ 0,3.** Achado medindo dispersão do erro de lambda
+  dentro de cada célula nos 3 logs — cai pela metade de 0 pra 0,3 e depois
+  não melhora mais, só perde célula. `--min-peso` ajusta.
+
+**Achados, todos verificados no dado real (4 logs, ~124 mil amostras
+injetando):**
+
+1. **MAP vs. baro discordam ~8-10 kPa em repouso** (MAP lê ~90 e poucos, baro
+   100). É o sensor MPX5700A (7 bar) dentro do próprio spec (±2,5% do fundo de
+   escala = ±17,5 kPa) — **não é erro de calibração, `mapMin=-31`/`mapMax=746`
+   é a calibração correta pro sensor físico**. Recalibrar mentiria a leitura.
+   Sem ação por enquanto, mas guardar: **qualquer correção baseada no baro
+   neste carro está parcialmente corrigindo discordância entre sensores, não
+   só altitude** — diferente do outro carro do usuário, onde MAP e baro batem
+   exatos parados e por isso a multiplicação por MAP já corrige sozinha sem
+   precisar de `Baro Correction`. Critério do usuário pra ativar essa tabela
+   aqui: só quando a diferença for inconstestável (mesma carga/condição,
+   baro diferente, nada mais explica).
+2. **Resolução do MAP**: uniforme, ~0,76 kPa/contagem de ADC (10 bits em 777
+   kPa de faixa). Sem lacuna na leitura nem piso de resolução diferente —
+   degrada em vácuo alto só por ser fração maior da leitura (5% a 15kPa vs.
+   1% a 80kPa), não por limitação física adicional.
+3. **Bins de carga**: tinha 3 pares a 2 kPa de distância (72/74, 78/80) — menos
+   que a resolução do sensor (~2,6 contagens), não resolvíveis. E o primeiro
+   bin (22) ficava acima de onde o carro roda de verdade: com o filtro
+   excluindo corte corretamente, ~14% de tudo que injeta fica ≤21 kPa (descida
+   com TPS de 3-5% segurando o carro, não marcha lenta — marcha lenta deste
+   carro fica em 26-29 kPa). Primeiro bin recalibrado pelo usuário pro menor
+   MAP médio que ainda injeta na maioria das vezes.
+4. **Viés subida × descida é real, mas é transitório, não estrutural** —
+   mistura fica mais pobre subindo que descendo na MESMA célula RPM×MAP,
+   consistente nos 3 logs (+0,4 a +1,4pp). Não é IAT (ΔIAT subida-descida
+   medido em +0,07°C, irrelevante). Encolhe quando o filtro aperta → é filme
+   de combustível na parede do coletor/porta (pior com etanol, calor de
+   vaporização maior), o mesmo motivo de existir AE/enleanment. **Implicação:
+   não deve virar valor de VE** — entra na tabela só o valor das amostras mais
+   estáveis; a diferença residual é papel do AE/enleanment, não da VE.
+   Pendente: separar "ladeira real" de "MAP subindo" (são a mesma coisa nesse
+   teste) exigiria altitude real (GPS) com MAP constante — não fechado, só
+   citado se um dia quiser confirmar isso à parte.
+5. **`decelAmount = 78%`** na tune explica os GammaE≈77 vistos no log
+   (enleanment de desaceleração, não enriquecimento). Critério do usuário:
+   GammaE fora de ~95-105 não é descarte automático por si só — ele carrega
+   correções legítimas (flex/IAT/CLT) que costumam estar bem calibradas; o
+   descarte certo é pelas flags de transitório (item acima), não por faixa de
+   GammaE.
+
+**Descartado por ora**: rede neural pra classificar "trecho bom" (não há
+rótulo independente pra aprender — o filtro de regras/peso é o método;
+ML já é usado no estágio de *correção* em `ve_map_optimizer.py`, que é onde
+faz sentido). GPS pra qualificar carga (MAP com mesma rotação já é a carga —
+redundante); GPS só teria uso se um dia quiser desconfundir ladeira de MAP
+subindo (item 4 acima), não como substituto de carga.
+
+**Pendente, próximo passo natural**: pausar/retomar gravação da tela
+principal (não só start/stop em Configurações) — deixa o usuário pausar em
+trânsito/semáforo/oscilação e eliminar lixo na origem, sem precisar do
+filtro pra isso depois.
 
 ## Arquivos
 
