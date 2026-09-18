@@ -1,0 +1,12 @@
+services:
+  obd2-web:
+    build: .
+    container_name: obd2-web
+    restart: unless-stopped
+    ports:
+      - "8420:80"
+    volumes:
+      # Live-edit sem rebuild — mesmo padrão do car/web (nginx serve, código
+      # montado por fora). Tirar o volume em produção se um dia sair do "só
+      # eu uso" pra rodar num lugar fixo.
+      - ./src:/usr/share/nginx/html:ro
