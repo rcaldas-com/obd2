@@ -4,16 +4,73 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
   <title>OBD2 / Speeduino</title>
+  <link rel="icon" type="image/svg+xml" href="img/favicon.svg" />
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
-  <div id="topbar">
-    <span id="status">Desconectado</span>
-    <button id="btn-connect">Conectar ELM327</button>
-    <button id="btn-disconnect" hidden>Desconectar</button>
+  <div id="content">
+    <canvas id="chart"></canvas>
+    <canvas id="dashboard" hidden></canvas>
+    <div id="alert-banner" hidden></div>
   </div>
 
-  <canvas id="chart"></canvas>
+  <!-- Barra inferior mínima — mesmo papel da barra do APK: fica no layout
+       normal (não sobrepõe o gráfico/dashboard), só o essencial pra dirigir
+       com o app aberto. O resto (conexões, alertas, log) fica em
+       Configurações. -->
+  <div id="bottom-bar">
+    <button id="btn-settings" class="bar-btn" title="Configurações">☰</button>
+    <div class="bar-spacer"></div>
+    <span id="bar-voltage" class="bar-voltage"></span>
+    <button id="btn-pause-log" class="bar-btn" hidden title="Pausar/retomar log">II</button>
+    <button id="btn-toggle-screen" class="bar-btn" title="Alternar tela">⚙</button>
+  </div>
+
+  <div id="settings-panel" hidden>
+    <div id="settings-content">
+      <h2>Configurações</h2>
+
+      <section>
+        <h3>Conexões</h3>
+        <div class="settings-row">
+          <span id="status">Desconectado</span>
+          <button id="btn-connect">Conectar ELM327</button>
+          <button id="btn-disconnect" hidden>Desconectar</button>
+        </div>
+        <div class="settings-row">
+          <span id="status-speeduino">Speeduino desconectada</span>
+          <button id="btn-connect-speeduino">Conectar Speeduino</button>
+          <button id="btn-disconnect-speeduino" hidden>Desconectar</button>
+        </div>
+      </section>
+
+      <section>
+        <h3>Alertas</h3>
+        <label>Tensão mínima (V)
+          <input id="cfg-voltage-min" type="number" step="0.1" inputmode="decimal">
+        </label>
+        <label>Histerese tensão (V)
+          <input id="cfg-voltage-hyst" type="number" step="0.1" inputmode="decimal">
+        </label>
+        <label>Temperatura máxima (°C)
+          <input id="cfg-temp-max" type="number" step="1" inputmode="decimal">
+        </label>
+        <label>Histerese temperatura (°C)
+          <input id="cfg-temp-hyst" type="number" step="1" inputmode="decimal">
+        </label>
+        <button id="btn-save-alerts">Salvar</button>
+      </section>
+
+      <section>
+        <h3>Log combinado (.msl)</h3>
+        <button id="btn-log-start">Gravar log</button>
+        <button id="btn-log-stop" hidden>Parar log</button>
+        <span id="log-status"></span>
+      </section>
+
+      <button id="btn-close-settings">Voltar</button>
+    </div>
+  </div>
 
   <script type="module" src="js/app.js"></script>
 </body>

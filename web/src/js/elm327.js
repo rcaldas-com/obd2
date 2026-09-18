@@ -36,7 +36,7 @@ export class Elm327Manager {
   async _init() {
     await this.session.write('ATZ\r'); // reset
     await this._sleep(1500);
-    this.session.clearBuffer();
+    this.session.clearBytes();
 
     await this._cmd('ATE0');   // echo off
     await this._cmd('ATL0');   // linefeeds off
@@ -109,6 +109,57 @@ export class Elm327Manager {
     // Conversão mA→lambda igual ao Android e ao script Python original.
     const lambda = current <= 0 ? 1.0 + current * 0.25 : 1.0 + current * 0.5;
     return { current, lambda };
+  }
+
+  /** Lê RPM/água/ar-admissão/velocidade/bateria — chamado só quando a tela
+   * de dashboard está ativa (fora dela, o loop de poll nem chama isso, pra
+   * não disputar banda com os PIDs de lambda). */
+  async readDashboardData() {
+    const data = {
+      rpm: null, coolantTemp: null, intakeAirTemp: null, speed: null,
+      batteryVoltage: null, timestamp: Date.now(),
+    };
+    if (!this.connected) return data;
+
+    const rpmResp = await this.queryPid('010C');
+    if (rpmResp) {
+      const hex = rpmResp.replace(/^.*410C/, '');
+      if (hex.length >= 4) {
+        const a = parseInt(hex.substring(0, 2), 16);
+        const b = parseInt(hex.substring(2, 4), 16);
+        data.rpm = Math.floor((256 * a + b) / 4);
+      }
+    }
+
+    data.coolantTemp = await this.readCoolantTemp();
+
+    const iatResp = await this.queryPid('010F');
+    if (iatResp) {
+      const hex = iatResp.replace(/^.*410F/, '');
+      if (hex.length >= 2) data.intakeAirTemp = parseInt(hex.substring(0, 2), 16) - 40;
+    }
+
+    const speedResp = await this.queryPid('010D');
+    if (speedResp) {
+      const hex = speedResp.replace(/^.*410D/, '');
+      if (hex.length >= 2) data.speed = parseInt(hex.substring(0, 2), 16);
+    }
+
+    data.batteryVoltage = await this.readBatteryVoltage();
+
+    return data;
+  }
+
+  /** Só a temperatura do líquido de arrefecimento (PID 0105, 1 byte) —
+   * consulta única e rápida, chamada em baixa frequência na tela de lambda
+   * (junto da voltagem) pra manter os alertas vivos independente da tela. */
+  async readCoolantTemp() {
+    if (!this.connected) return null;
+    const resp = await this.queryPid('0105');
+    if (!resp) return null;
+    const hex = resp.replace(/^.*4105/, '');
+    if (hex.length < 2) return null;
+    return parseInt(hex.substring(0, 2), 16) - 40;
   }
 
   /** Comando local do adaptador (não consulta a ECU) — leve, pode ser

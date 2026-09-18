@@ -284,6 +284,53 @@ filtro pra isso depois.
 USB é o quê), `UsbSerialSession.java`, `GpsSpeedProvider.java`,
 `AlertManager.java`.
 
+## Porte web (web/) — WebSerial + Docker
+
+Mesmo app, rodando no navegador (Chrome/Edge, precisa de contexto seguro —
+`http://localhost` conta, IP de rede não) em vez de instalado no celular.
+Container só serve estático (`nginx:alpine`, sem build step — ES modules
+direto, `<script type="module">`); a comunicação serial acontece no próprio
+navegador via `navigator.serial` (WebSerial), não no container — Docker aqui
+é só o servidor de arquivos, USB nunca entra nele.
+
+Portado até agora: telas de lambda e dashboard, alertas de tensão/água,
+log .msl. Arquitetura por arquivo, cada um porte direto do equivalente
+Android:
+
+- `serial.js` — porte de `UsbSerialSession`, mas com uma diferença
+  deliberada: um único loop de leitura (`_pump`) persistente por trás de um
+  buffer de bytes compartilhado, em vez de repetir `reader.read()` a cada
+  timeout (que correria risco de uma leitura abandonada roubar o próximo
+  pedaço de dado — a WebSerial não tem `read(buf, timeoutMs)` bloqueante
+  como o Android). Serve tanto o protocolo texto do ELM327 (`readUntil`)
+  quanto o binário da Speeduino (`byteLength/peekBytes/takeBytes/waitForBytes`).
+- `elm327.js` / `speeduino.js` — porte de `Elm327Manager`/`SpeeduinoManager`,
+  mesmos PIDs, offsets, escalas e CRC32 (conferido contra `java.util.zip.CRC32`
+  e `zlib.crc32` do Python).
+- `dashboard.js` — porte de `DashboardView` pra Canvas 2D (mapeamento quase
+  1:1: `Paint`→`ctx.fillStyle`, `drawArc`→`ctx.arc`, `drawRoundRect`→
+  `ctx.roundRect`, nativo desde Chrome 99 — seguro dado que o app já exige
+  Chromium pela WebSerial).
+- `alerts.js` — porte de `AlertManager`, só os dois alertas fixos (tensão
+  baixa, água quente); os alertas personalizados por PID (`CustomAlertRule`,
+  com tela própria de cadastro no Android) ficaram de fora — o web app ainda
+  não tem tela de configurações.
+- `mslLogger.js` — porte de `MslLogger`, mesmas colunas/ordem/motivos (ver
+  `## Logs` acima). Sem `java.io` aqui: usa a File System Access API
+  (`showSaveFilePicker` + stream gravável), Chromium-only como o resto.
+
+`app.js` orquestra os dois loops de poll independentes (mesma razão do
+Android: a porta do ELM327 é uma só, cada PID a mais nela derruba a taxa de
+todos; a Speeduino tem porta própria, então seu loop roda sempre, não só na
+tela de dashboard) e a troca de tela — que só existe como estado de UI, sem
+efeito na exclusividade de porta serial (isso já é garantido pelo SO, do
+mesmo jeito nas duas plataformas).
+
+Fora de escopo por enquanto: tela de ponto/`KnockWatch` (é ao vivo por
+natureza — analisar depois sem lembrar da condição de pista é o problema que
+ela existe pra evitar; não portada), GPS (velocidade vem só do PID 010D),
+tela de configurações/alertas personalizados.
+
 ## Fora deste repo
 
 `~/obd2` é este projeto. O app de manutenções (`car`) é outro repo com

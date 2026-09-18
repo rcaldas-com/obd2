@@ -1,7 +1,7 @@
 // Transporte serial puro (abrir/escrever/ler/fechar), sem conhecimento de
 // protocolo — mesma divisão de responsabilidade do UsbSerialSession.java no
-// app Android. Cada Elm327Manager (e, quando existir, SpeeduinoManager) tem
-// sua própria instância, portas independentes.
+// app Android. Cada Elm327Manager/SpeeduinoManager tem sua própria
+// instância, portas independentes.
 //
 // Diferença de propósito em relação ao original: o Android expõe
 // port.read(buf, timeoutMs), uma leitura bloqueante com timeout que dá pra
@@ -12,14 +12,15 @@
 // dado que chegar, entregando bytes pra quem já desistiu de esperar por eles
 // em vez de para a leitura lógica atual. Por isso aqui só existe UM loop de
 // leitura (_pump), rodando em segundo plano a vida toda da conexão, jogando
-// tudo que chega num buffer de texto; readUntil() só espera esse buffer
-// atingir uma condição, nunca disputa o reader diretamente.
+// tudo que chega num buffer de BYTES bruto; quem espera resposta (texto do
+// ELM327 ou binário da Speeduino) só espera esse buffer, nunca disputa o
+// reader diretamente.
 export class SerialSession {
   constructor() {
     this.port = null;
     this.reader = null;
     this.writer = null;
-    this._buf = '';
+    this._bytes = new Uint8Array(0);
     this._pumping = false;
     this._waiters = [];
   }
@@ -36,22 +37,22 @@ export class SerialSession {
     await this.port.open({ baudRate, dataBits: 8, stopBits: 1, parity: 'none' });
     this.writer = this.port.writable.getWriter();
     this.reader = this.port.readable.getReader();
-    this._buf = '';
+    this._bytes = new Uint8Array(0);
     this._pumping = true;
     this._pump();
   }
 
   async _pump() {
-    const decoder = new TextDecoder('ascii');
     try {
       while (this._pumping) {
         const { value, done } = await this.reader.read();
         if (done) break;
         if (value && value.length) {
-          this._buf += decoder.decode(value, { stream: true });
-          const waiters = this._waiters;
-          this._waiters = [];
-          for (const wake of waiters) wake();
+          const merged = new Uint8Array(this._bytes.length + value.length);
+          merged.set(this._bytes, 0);
+          merged.set(value, this._bytes.length);
+          this._bytes = merged;
+          this._wake();
         }
       }
     } catch (e) {
@@ -60,35 +61,78 @@ export class SerialSession {
     }
   }
 
-  async write(text) {
-    if (!this.writer) throw new Error('porta não está aberta');
-    await this.writer.write(new TextEncoder().encode(text));
+  _wake() {
+    const waiters = this._waiters;
+    this._waiters = [];
+    for (const wake of waiters) wake();
   }
 
-  /** Espera até o buffer acumulado conter `marker` ou o tempo esgotar.
-   * Devolve tudo que tiver no buffer até agora (marker incluso) e limpa —
-   * equivalente ao readResponse() do Elm327Manager.java, que também lê até
-   * achar '>' ou estourar o deadline. */
-  async readUntil(marker, timeoutMs) {
+  /** Aceita string (protocolo texto do ELM327, auto-codificada em ASCII) ou
+   * Uint8Array (protocolo binário da Speeduino). */
+  async write(data) {
+    if (!this.writer) throw new Error('porta não está aberta');
+    const bytes = typeof data === 'string' ? new TextEncoder().encode(data) : data;
+    await this.writer.write(bytes);
+  }
+
+  byteLength() {
+    return this._bytes.length;
+  }
+
+  /** Olha os primeiros n bytes sem consumir — usado pra ler o cabeçalho de
+   * tamanho do protocolo da Speeduino antes de saber quanto ainda falta. */
+  peekBytes(n) {
+    return this._bytes.slice(0, Math.min(n, this._bytes.length));
+  }
+
+  /** Consome e devolve os primeiros n bytes (ou o que tiver, se for menos). */
+  takeBytes(n) {
+    const take = Math.min(n, this._bytes.length);
+    const out = this._bytes.slice(0, take);
+    this._bytes = this._bytes.slice(take);
+    return out;
+  }
+
+  /** Descarta qualquer byte parado no buffer — equivalente ao
+   * drainBuffer()/clearBuffer() do Android, chamado antes de mandar um
+   * comando novo pra não confundir sobra de uma troca anterior incompleta
+   * com o início da resposta atual. */
+  clearBytes() {
+    this._bytes = new Uint8Array(0);
+  }
+
+  /** Espera até o buffer ter pelo menos minBytes ou o tempo esgotar. */
+  async waitForBytes(minBytes, timeoutMs) {
     const deadline = Date.now() + timeoutMs;
-    while (!this._buf.includes(marker)) {
+    while (this._bytes.length < minBytes) {
       const remaining = deadline - Date.now();
       if (remaining <= 0) break;
       await new Promise((resolve) => {
         this._waiters.push(resolve);
         // acorda periodicamente mesmo sem dado novo, só pra reavaliar o
-        // deadline — sem isso um _wake() que nunca vem prende a espera até
-        // o timeout do Promise.race não existir (não tem aqui, é direto).
+        // deadline.
         setTimeout(resolve, Math.min(remaining, 50));
       });
     }
-    const out = this._buf;
-    this._buf = '';
-    return out;
   }
 
-  clearBuffer() {
-    this._buf = '';
+  /** Espera até o buffer (interpretado como ASCII) conter `marker` ou o
+   * tempo esgotar — protocolo de texto do ELM327. Devolve tudo que tiver
+   * decodificado até agora (marker incluso) e limpa o buffer. */
+  async readUntil(marker, timeoutMs) {
+    const decoder = new TextDecoder('ascii');
+    const deadline = Date.now() + timeoutMs;
+    while (!decoder.decode(this._bytes).includes(marker)) {
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) break;
+      await new Promise((resolve) => {
+        this._waiters.push(resolve);
+        setTimeout(resolve, Math.min(remaining, 50));
+      });
+    }
+    const text = decoder.decode(this._bytes);
+    this._bytes = new Uint8Array(0);
+    return text;
   }
 
   async close() {
