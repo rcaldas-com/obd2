@@ -15,10 +15,16 @@
 // Chromium-only, mesma exigência da WebSerial que o resto do app já tem.
 const TICK_MS = 100; // 10Hz, igual ao Android
 
+// Nomes batidos contra um log .msl exportado direto do TunerStudio (sem
+// nosso app, carro só com Speeduino) — a maioria já era igual, só
+// GammaE/RPMdot/TPSdot/Engine Status/Baro Correction tinham grafia própria
+// daqui; trocados pra bater com o nome padrão do TunerStudio (ver
+// CLAUDE.md). Lambda2 fica de exceção — não existe no log padrão, é
+// específico deste carro (sonda 1 com problema).
 const COLUMN_NAMES = [
-  'Time', 'RPM', 'MAP', 'TPS', 'CLT', 'IAT', 'Baro Pressure', 'Baro Correction',
-  'VE _Current', 'GammaE', 'Lambda Target', 'Lambda', 'Lambda2', 'Ethanol',
-  'RPMdot', 'MAPdot', 'TPSdot', 'DFCO', 'Engine Status', 'Accel Enrich',
+  'Time', 'RPM', 'MAP', 'TPS', 'CLT', 'IAT', 'Baro Pressure', 'Gbaro',
+  'VE _Current', 'Gammae', 'Lambda Target', 'Lambda', 'Lambda2', 'Ethanol',
+  'rpm/s', 'MAPdot', 'TPS DOT', 'DFCO', 'Engine', 'Accel Enrich',
 ];
 const COLUMN_UNITS = [
   's', 'rpm', 'kpa', '%', '', '', 'kpa', '%',

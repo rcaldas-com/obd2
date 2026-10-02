@@ -168,42 +168,76 @@ indicador "REC" nas telas.
 **O log é hoje pra corrigir VE, não ponto** (ponto é ao vivo — ver a tela
 acima; o log já teve `Advance _Current`/`Advance_OBD2`, foram removidas).
 Colunas atuais, todas da Speeduino exceto Lambda/Lambda2 (que só o ELM327 tem,
-sondas na injeção original):
+sondas na injeção original). Nomes batidos contra um log `.msl` exportado
+direto do TunerStudio (sem o nosso app, carro só com Speeduino) em
+2026-10-01 — a maioria já batia, só `GammaE`/`RPMdot`/`TPSdot`/`Engine
+Status`/`Baro Correction` tinham grafia própria daqui e foram trocadas pro
+nome padrão do TunerStudio, pra deixar os dois tipos de log comparáveis:
 
-`Time, RPM, MAP, TPS, CLT, IAT, Baro Pressure, Baro Correction, VE _Current,
-GammaE, Lambda Target, Lambda, Lambda2, Ethanol, RPMdot, MAPdot, TPSdot, DFCO,
-Engine Status, Accel Enrich`
+`Time, RPM, MAP, TPS, CLT, IAT, Baro Pressure, Gbaro, VE _Current, Gammae,
+Lambda Target, Lambda, Lambda2, Ethanol, rpm/s, MAPdot, TPS DOT, DFCO,
+Engine, Accel Enrich`
 
+- **Lambda2 é exceção**: não existe em log padrão do TunerStudio, é
+  específico deste carro (sonda 1 com defeito, lambda2 é a boa).
 - **VE _Current**, não VE1/VE2: é a VE realmente usada no cálculo do PW, as
   outras são só a leitura crua da tabela.
 - **Lambda Target**, não AFR: AFR não é comparável entre etanol/gasolina;
   calculado como `afrTarget / stoich`, e `stoich` é config da tune (não sai no
   bloco ao vivo) — lido uma vez por conexão via comando de leitura de página
   `'p'` (`SpeeduinoManager.readStoich()`, página 1 offset 50).
-- **DFCO** (byte 1 bit 4), **Engine Status** (byte 2 cru — running/crank/ASE/
+- **DFCO** (byte 1 bit 4), **Engine** (byte 2 cru — running/crank/ASE/
   warmup/AE por TPS/enleanment de desaceleração/AE por MAP/enleanment por MAP)
   e **Accel Enrich** (byte 16, %): decodificadas pra filtrar corte/transitório
-  com precisão, sem depender de olhar o GammaE cru (que carrega correções
+  com precisão, sem depender de olhar o Gammae cru (que carrega correções
   legítimas de flex/IAT/CLT junto, então nem sempre fica perto de 100 — ver
   seção de VE abaixo).
-- **MAPdot vem sempre zero** — o firmware só calcula quando `aeMode = MAP` na
-  tune; este carro usa `aeMode = TPS`. Não é bug, é peso morto nesta config.
+- **MAPdot e Ethanol não apareceram** no log padrão do TunerStudio usado pra
+  conferir esses nomes (projeto não tinha esses canais habilitados nessa
+  captura) — mantidos como estão até aparecerem num log real pra confirmar.
+- **MAPdot vem sempre zero** neste carro — o firmware só calcula quando
+  `aeMode = MAP` na tune; este carro usa `aeMode = TPS`. Não é bug, é peso
+  morto nesta config.
 
 ## Acerto de tabela VE a partir do log — ferramenta e achados
 
 Objetivo: usar os logs pra corrigir a tabela VE (motor tunado com 35% de
 etanol, tabela original não reflete isso direito). Fica em `filter_log/`
-(ignorado no git — são dados de teste, não código; ver `.gitignore`).
+(ignorado no git — são dados de teste, não código; ver `.gitignore`, cobre
+`.msl` e `.mlg`). `.mlg` (formato binário nativo do TunerStudio) não é
+decodificado aqui — converter pra `.msl` no próprio TunerStudio antes; não
+compensa reimplementar um formato binário proprietário pra um caso pouco
+frequente, e o conversor do TS já garante escala/campo corretos.
 
 **`filter_log/ve_filter.py`** — filtra um `.msl` deixando só os momentos
 utilizáveis, com **peso contínuo (0-1) por amostra**, não corte binário: o que
 estraga uma leitura não é estar variando agora, é ter variado há pouco e a
-sonda ainda não ter alcançado.
+sonda ainda não ter alcançado. Aceita tanto log do nosso app quanto log
+padrão direto do TunerStudio (`pega_alias()` tenta os dois nomes possíveis de
+cada coluna renomeada — ver seção de Logs acima).
 
-- Descarte duro: DFCO, AE/enleanment ativo (via `Engine Status`/`DFCO`; em log
-  antigo sem essas colunas, cai pro fallback `GammaE == 0` — mais fraco, só
+- Descarte duro: DFCO, AE/enleanment ativo (via `Engine`/`DFCO`; em log
+  antigo sem essas colunas, cai pro fallback `Gammae == 0` — mais fraco, só
   pega corte, não AE/enleanment isolado), ASE/warmup, motor frio (CLT < 70°C),
   lambda fora de 0,6-1,6.
+- **Warmup: prefere `Gwarm` ao bit do byte `Engine` quando a coluna existe.**
+  Achado num log padrão do TunerStudio (2026-09-30): o bit WARMUP ficou
+  **ligado em 100% das 31 mil amostras**, com CLT estável em 87-92°C e
+  `Gwarm` travado em 100% o tempo todo (nenhuma correção de aquecimento de
+  fato acontecendo) — zerava a cobertura toda (0 amostras sobreviviam a
+  qualquer limiar). Causa (confirmada pelo usuário, que configura a tabela
+  WUE direto no TunerStudio): o bit parece acompanhar "CLT ainda não chegou
+  no último bin da tabela WUE", não "correção ainda diferente de 100%" — e
+  o último bin desta tune é 102°C/110% (não 100%), porque o usuário usa essa
+  tabela também como proteção contra superaquecimento (enriquece a mistura
+  acima de certa temperatura pra ajudar a esfriar; baixou esse limite pra
+  105°C depois, considerando 110% em 102°C exagerado — carro raramente chega
+  lá em condição normal). Então qualquer CLT abaixo do último bin mantém o
+  bit ligado mesmo com a correção já achatada em 100% no meio da tabela — é
+  comportamento do firmware com essa tune, não bug do log nem do filtro.
+  `Gwarm != 100%` é o sinal direto (o próprio fator aplicado), por isso tem
+  prioridade quando a coluna existe; sem ela (log antigo do nosso app, que
+  não loga `Gwarm`), cai pro bit de novo, sem mudança de comportamento.
 - Janela de assentamento depois de qualquer um desses (1,5s + rampa de 1,5s) —
   sem isso sobra "eco" do transitório mesmo com a flag já desarmada.
 - Atraso da sonda **variável**, não fixo: escala com o inverso do fluxo

@@ -74,6 +74,17 @@ def num(v, padrao=None):
         return padrao
 
 
+def pega_alias(r, *nomes):
+    """Tenta cada nome possível da mesma coluna, na ordem dada — compat
+    entre o nome padrão do TunerStudio e a grafia antiga do nosso MslLogger
+    (logs já gravados antes da troca continuam lendo normal)."""
+    for n in nomes:
+        v = r.get(n)
+        if v is not None:
+            return v
+    return None
+
+
 def ler_bins_tune(caminho_msq):
     """Extrai fuelLoadBins e rpmBins do .msq do TunerStudio."""
     if not caminho_msq or not os.path.exists(caminho_msq):
@@ -111,7 +122,11 @@ def ler_resolucao_map(caminho_msq):
 def preparar(dados):
     """Anota cada amostra com o que o filtro precisa: flags, estabilidade,
     tempo desde o último transitório e lambda já casado com o atraso."""
-    tem_flags = 'Engine Status' in dados[0] if dados else False
+    # 'Engine'/'Gammae'/'rpm/s'/'TPS DOT' são os nomes do log padrão do
+    # TunerStudio; 'Engine Status'/'GammaE'/'RPMdot'/'TPSdot' são a grafia
+    # antiga do nosso MslLogger (logs gravados antes da troca pro nome
+    # padrão, ver CLAUDE.md) — pega_alias() aceita as duas.
+    tem_flags = ('Engine' in dados[0] or 'Engine Status' in dados[0]) if dados else False
     tem_alvo = 'Lambda Target' in dados[0] if dados else False
 
     for i, r in enumerate(dados):
@@ -123,14 +138,23 @@ def preparar(dados):
         r['_lam'] = num(r.get('Lambda'))
         r['_alvo'] = num(r.get('Lambda Target')) if tem_alvo else None
         r['_ve'] = num(r.get('VE _Current'))
-        r['_gammae'] = num(r.get('GammaE'))
-        r['_rpmdot'] = num(r.get('RPMdot'), 0.0)
-        r['_tpsdot'] = num(r.get('TPSdot'), 0.0)
+        r['_gammae'] = num(pega_alias(r, 'Gammae', 'GammaE'))
+        r['_rpmdot'] = num(pega_alias(r, 'rpm/s', 'RPMdot'), 0.0)
+        r['_tpsdot'] = num(pega_alias(r, 'TPS DOT', 'TPSdot'), 0.0)
 
         # --- transitório ativo? preferir as flags da ECU; sem elas, heurística
-        est = int(num(r.get('Engine Status'), 0) or 0) if tem_flags else None
+        est = int(num(pega_alias(r, 'Engine', 'Engine Status'), 0) or 0) if tem_flags else None
         dfco_flag = num(r.get('DFCO'))
         ae_pct = num(r.get('Accel Enrich'))
+        # 'Gwarm' (correção de aquecimento, só existe no log padrão do
+        # TunerStudio) é mais confiável que o bit WARMUP do byte de status:
+        # num log real o bit ficou LIGADO o tempo todo (100% das amostras)
+        # com CLT estável em 87-92°C e Gwarm travado em 100% (sem nenhuma
+        # correção de fato acontecendo) — o bit não reflete o que o motor
+        # está fazendo nesse firmware/condição. Gwarm!=100% é o sinal
+        # direto (o próprio fator aplicado), por isso tem prioridade;
+        # sem ele (log antigo do nosso app), cai pro bit de novo.
+        gwarm = num(r.get('Gwarm'))
 
         motivos = []
         if tem_flags and est is not None:
@@ -140,7 +164,10 @@ def preparar(dados):
                 motivos.append('partida')
             if (est >> BIT_ASE) & 1:
                 motivos.append('ASE')
-            if (est >> BIT_WARMUP) & 1:
+            if gwarm is not None:
+                if abs(gwarm - 100) > 1:
+                    motivos.append('warmup')
+            elif (est >> BIT_WARMUP) & 1:
                 motivos.append('warmup')
             if (est >> BIT_AE_TPS) & 1 or (est >> BIT_AE_MAP) & 1:
                 motivos.append('AE')
@@ -371,7 +398,7 @@ def main():
         cab, nomes, unid, dados = ler_msl(caminho)
         if not dados:
             print('  vazio'); continue
-        tem_flags = 'Engine Status' in dados[0]
+        tem_flags = 'Engine' in dados[0] or 'Engine Status' in dados[0]
         print(f'  {len(dados)} amostras | flags da ECU: {"sim" if tem_flags else "não (log antigo, usando GammaE)"}')
 
         dados = preparar(dados)

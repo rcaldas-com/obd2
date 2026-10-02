@@ -1,7 +1,8 @@
 **__pycache__
 .ipynb_checkpoints
 logs/*
-# Dados de log (.msl) não são código — mas o script que os processa é.
+# Dados de log (.msl/.mlg) não são código — mas o script que os processa é.
 filter_log/*.msl
+filter_log/*.mlg
 venv
 /app/

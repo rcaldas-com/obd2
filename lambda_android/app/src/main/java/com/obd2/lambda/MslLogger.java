@@ -62,10 +62,16 @@ public class MslLogger {
     // proposital: mantém a posição das colunas já existentes intacta pra
     // qualquer análise que já leia log antigo por nome de coluna (não por
     // posição) continuar funcionando igual em cima de logs novos.
+    // Nomes batidos contra um log .msl exportado direto do TunerStudio
+    // (sem nosso app, carro só com Speeduino) — a maioria já era igual, só
+    // GammaE/RPMdot/TPSdot/Engine Status/Baro Correction tinham grafia
+    // própria daqui; trocados pra bater com o nome padrão do TunerStudio
+    // (ver CLAUDE.md). Lambda2 fica de exceção — não existe no log padrão,
+    // é específico deste carro (sonda 1 com problema).
     private static final String[] COLUMN_NAMES = {
-            "Time", "RPM", "MAP", "TPS", "CLT", "IAT", "Baro Pressure", "Baro Correction",
-            "VE _Current", "GammaE", "Lambda Target", "Lambda", "Lambda2", "Ethanol",
-            "RPMdot", "MAPdot", "TPSdot", "DFCO", "Engine Status", "Accel Enrich",
+            "Time", "RPM", "MAP", "TPS", "CLT", "IAT", "Baro Pressure", "Gbaro",
+            "VE _Current", "Gammae", "Lambda Target", "Lambda", "Lambda2", "Ethanol",
+            "rpm/s", "MAPdot", "TPS DOT", "DFCO", "Engine", "Accel Enrich",
     };
     private static final String[] COLUMN_UNITS = {
             "s", "rpm", "kpa", "%", "", "", "kpa", "%",
